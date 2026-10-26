@@ -1,0 +1,13 @@
+# raw survey data: never commit (this repo is public)
+analysis/data/
+*.sav
+analysis/**/*.csv
+
+# exploratory output
+analysis/output/
+
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata

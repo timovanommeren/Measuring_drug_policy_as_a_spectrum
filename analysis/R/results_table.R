@@ -18,11 +18,13 @@ demographics <- list(
   "Urbanisation" = list(var = "urb",       labels = c("Very high", "High", "Moderate", "Low", "Not urban"))
 )
 
-df <- df |> mutate(urb = haven::as_factor(urb), total = factor("Total"))
+df <- df |> mutate(urb = haven::as_factor(urb), edu_2_rec = haven::as_factor(edu_2_rec),
+                   total = factor("Total"))
 
 # one row per respondent x drug
 long <- df |>
-  select(w, total, all_of(unname(map_chr(demographics, "var"))),all_of(paste0("regime_", names(blocks)))) |>
+  select(w, total, all_of(unname(map_chr(demographics, "var"))), edu_2_rec,
+         all_of(paste0("regime_", names(blocks)))) |>
   pivot_longer(starts_with("regime_"), names_to = "drug", names_prefix = "regime_",
                values_to = "regime") |>
   filter(!is.na(regime)) |>
@@ -101,28 +103,35 @@ drug_labels <- c(alcohol = "Alcohol", tabak_en_vapes = "Tobacco and vapes", cann
                  psychedelica = "Psychedelics", mdma = "MDMA", cocaine = "Cocaine / crack",
                  speed = "Speed", heroine = "Heroin")
 
-# outermost categories (level positions): bar = second minus first
+# two groups per demographic, as level positions; bar = second minus first
 contrasts <- list(
-  "Age"            = c(first = 1, second = 4),
-  "Vote (TK 2025)" = c(first = 1, second = 3),
-  "Education"      = c(first = 3, second = 1),
-  "Sex"            = c(first = 1, second = 2),
-  "Urbanisation"   = c(first = 1, second = 5)
+  "Age"            = list(var = "age_4_rec", first = 1:2, second = 3:4,
+                          labels = c("18–49", "50+")),
+  "Vote (TK 2025)" = list(var = "vote_3",    first = 1,   second = 3,
+                          labels = c("Left", "Right")),
+  "Education"      = list(var = "edu_2_rec", first = 2,   second = 1,
+                          labels = c("Theoretical", "Practical")),
+  "Urbanisation"   = list(var = "urb",       first = 1:2, second = 4:5,
+                          labels = c("Urban", "Rural"))
 )
 
+# the respondent's group in a contrast: "first", "second" or NA
+contrast_group <- function(x, cn) {
+  pos <- as.integer(x)
+  case_when(pos %in% cn$first ~ "first", pos %in% cn$second ~ "second")
+}
+
 regime_shift <- function(name) {
-  d <- demographics[[name]]
-  lv <- levels(df[[d$var]])[contrasts[[name]]]
-  lab <- str_replace_all(d$labels[contrasts[[name]]], "--", "–")
+  cn <- contrasts[[name]]
   long |>
-    filter(.data[[d$var]] %in% lv) |>
-    mutate(group = if_else(.data[[d$var]] == lv[1], "first", "second")) |>
+    mutate(group = contrast_group(.data[[cn$var]], cn)) |>
+    filter(!is.na(group)) |>
     summarise(w = sum(w), .by = c(group, drug, regime)) |>
     complete(group, drug, regime, fill = list(w = 0)) |>
     mutate(p = 100 * w / sum(w), .by = c(group, drug)) |>
     select(-w) |>
     pivot_wider(names_from = group, values_from = p) |>
-    transmute(demo = name, contrast = paste0(lab[2], " vs ", lab[1]), drug, regime,
+    transmute(demo = name, contrast = paste0(cn$labels[2], " vs ", cn$labels[1]), drug, regime,
               shift = second - first)
 }
 
@@ -159,23 +168,22 @@ p_shifts <- ggplot(shifts, aes(shift, drug, fill = regime)) +
         strip.text.y = element_text(angle = 0, hjust = 0))
 
 ggsave(here::here("out", "fig_regime_shifts.pdf"), p_shifts,
-       width = 6.5, height = 8.5, device = cairo_pdf)
+       width = 6.5, height = 7, device = cairo_pdf)
 
 # n per group in the contrasts, for the caption
-contrast_n <- map_chr(names(contrasts), \(name) {
-  d <- demographics[[name]]
-  lab <- d$labels[contrasts[[name]]]
-  n <- table(df[[d$var]])[contrasts[[name]]]
-  sprintf("%s %d, %s %d", lab[2], n[[2]], lab[1], n[[1]])
+contrast_n <- map_chr(contrasts, \(cn) {
+  n <- table(contrast_group(df[[cn$var]], cn))
+  sprintf("%s %d, %s %d", cn$labels[2], n[["second"]], cn$labels[1], n[["first"]])
 })
 
 caption_shifts <- paste0(
-  "Shift in preferred grouped regime between the outermost categories of each demographic. ",
+  "Shift in preferred grouped regime between two groups per demographic: age 50+ vs 18--49; ",
+  "vote right vs left; practical (incl.\\ middle) vs theoretical education; ",
+  "rural (low or no urbanisation) vs urban (high or very high). ",
   "Bars give the difference in weighted share choosing a regime (percentage points; positive = more ",
   "in the first-named group); per drug the four shifts sum to zero. Drugs are ordered as in ",
   r"(Figure~\ref{fig:policy_preferences}; values of 15 or more are labelled. )",
   "Group sizes ($n$, unweighted): ", paste(contrast_n, collapse = "; "), ". ",
-  "The urbanisation contrast rests on few rural respondents. ",
   "Vote: parties grouped into left, middle and right (provisional)."
 )
 

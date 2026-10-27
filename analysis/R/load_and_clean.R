@@ -13,6 +13,15 @@ df <- haven::read_sav(here::here("analysis", "data", "NLOZ26-10_Drugsbeleid_gede
 df <- df |>
   mutate(across(starts_with("beleid_voorkeur_"), \(x) replace(x, x == 99, NA)))
 
+# grouped regimes: ban (1), medical/research (2-4), specialist shop (5-6), general market (7-9)
+regime_labels <- c("ban", "medical/research", "specialist shop", "general market")
+
+df <- df |>
+  mutate(across(starts_with("beleid_voorkeur_"),
+                \(x) factor(cut(as.numeric(x), c(0, 1, 4, 6, 9), labels = FALSE),
+                            levels = 1:4, labels = regime_labels),
+                .names = "{str_replace(.col, 'beleid_voorkeur_', 'regime_')}"))
+
 des <- survey::svydesign(ids = ~1, weights = ~w, data = df)
 
 

@@ -91,3 +91,99 @@ writeLines(c(
   r"(\end{tabular})",
   r"(\end{table})"
 ), here::here("out", "tab_regimes_demographics.tex"))
+
+
+## Regime shifts by demographic (figure)
+# per drug and regime: percentage points more (or fewer) in one group than in the other;
+# per drug the four shifts sum to 0
+
+drug_labels <- c(alcohol = "Alcohol", tabak_en_vapes = "Tobacco and vapes", cannabis = "Cannabis",
+                 psychedelica = "Psychedelics", mdma = "MDMA", cocaine = "Cocaine / crack",
+                 speed = "Speed", heroine = "Heroin")
+
+# outermost categories (level positions): bar = second minus first
+contrasts <- list(
+  "Age"            = c(first = 1, second = 4),
+  "Vote (TK 2025)" = c(first = 1, second = 3),
+  "Education"      = c(first = 3, second = 1),
+  "Sex"            = c(first = 1, second = 2),
+  "Urbanisation"   = c(first = 1, second = 5)
+)
+
+regime_shift <- function(name) {
+  d <- demographics[[name]]
+  lv <- levels(df[[d$var]])[contrasts[[name]]]
+  lab <- str_replace_all(d$labels[contrasts[[name]]], "--", "–")
+  long |>
+    filter(.data[[d$var]] %in% lv) |>
+    mutate(group = if_else(.data[[d$var]] == lv[1], "first", "second")) |>
+    summarise(w = sum(w), .by = c(group, drug, regime)) |>
+    complete(group, drug, regime, fill = list(w = 0)) |>
+    mutate(p = 100 * w / sum(w), .by = c(group, drug)) |>
+    select(-w) |>
+    pivot_wider(names_from = group, values_from = p) |>
+    transmute(demo = name, contrast = paste0(lab[2], " vs ", lab[1]), drug, regime,
+              shift = second - first)
+}
+
+shifts <- map(names(contrasts), regime_shift) |> list_rbind()
+stopifnot(all(abs(summarise(shifts, s = sum(shift), .by = c(demo, drug))$s) < 1e-6))
+
+# drugs in the order of the main figure (by weighted % ban), first on top
+drug_order <- long |>
+  summarise(ban = sum(w[regime == "ban"]) / sum(w), .by = drug) |>
+  arrange(ban) |>
+  pull(drug)
+
+shifts <- shifts |>
+  mutate(drug = factor(drug_labels[drug], levels = rev(drug_labels[drug_order])),
+         contrast = factor(contrast, levels = unique(contrast)),
+         regime = factor(regime, levels = regime_labels))
+
+# regime colours: the middle option of each group on the viridis scale of the main figure
+regime_colours <- setNames(viridisLite::viridis(9, end = 0.9)[c(1, 3, 6, 8)], regime_labels)
+
+p_shifts <- ggplot(shifts, aes(shift, drug, fill = regime)) +
+  geom_vline(xintercept = 0, colour = "grey50", linewidth = 0.3) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = if_else(abs(shift) >= 15, sprintf("%+.0f", shift), ""),
+                hjust = if_else(shift > 0, -0.15, 1.15)), size = 2) +
+  facet_grid(contrast ~ regime, labeller = labeller(contrast = label_wrap_gen(12), regime = str_to_sentence)) +
+  scale_fill_manual(values = regime_colours, guide = "none") +
+  scale_x_continuous(limits = c(-60, 60), breaks = c(-40, 0, 40)) +
+  labs(x = "Difference in percentage points (positive = more in first-named group)", y = NULL) +
+  theme_minimal(base_size = 8) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        strip.text = element_text(face = "bold"),
+        strip.text.y = element_text(angle = 0, hjust = 0))
+
+ggsave(here::here("out", "fig_regime_shifts.pdf"), p_shifts,
+       width = 6.5, height = 8.5, device = cairo_pdf)
+
+# n per group in the contrasts, for the caption
+contrast_n <- map_chr(names(contrasts), \(name) {
+  d <- demographics[[name]]
+  lab <- d$labels[contrasts[[name]]]
+  n <- table(df[[d$var]])[contrasts[[name]]]
+  sprintf("%s %d, %s %d", lab[2], n[[2]], lab[1], n[[1]])
+})
+
+caption_shifts <- paste0(
+  "Shift in preferred grouped regime between the outermost categories of each demographic. ",
+  "Bars give the difference in weighted share choosing a regime (percentage points; positive = more ",
+  "in the first-named group); per drug the four shifts sum to zero. Drugs are ordered as in ",
+  r"(Figure~\ref{fig:policy_preferences}; values of 15 or more are labelled. )",
+  "Group sizes ($n$, unweighted): ", paste(contrast_n, collapse = "; "), ". ",
+  "The urbanisation contrast rests on few rural respondents. ",
+  "Vote: parties grouped into left, middle and right (provisional)."
+)
+
+writeLines(c(
+  r"(\begin{figure}[H])",
+  r"(  \centering)",
+  r"(  \includegraphics[width=\linewidth]{out/fig_regime_shifts.pdf})",
+  paste0(r"(  \caption{)", caption_shifts, "}"),
+  r"(  \label{fig:regime_shifts})",
+  r"(\end{figure})"
+), here::here("out", "fig_regime_shifts.tex"))

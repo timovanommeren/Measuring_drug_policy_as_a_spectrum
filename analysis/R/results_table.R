@@ -159,53 +159,48 @@ drug_order <- long |>
   arrange(ban) |>
   pull(drug)
 
+# legend entries name the comparison, e.g. "Age: 50+ vs 18–49"
+demo_labels <- map_chr(contrasts, \(cn) paste0(cn$labels[2], " vs ", cn$labels[1]))
+demo_labels <- setNames(paste0(word(names(demo_labels), 1), ": ", demo_labels), names(demo_labels))
+demo_labels <- demo_labels[c("Age", "Education", "Urbanisation", "Vote (TK 2025)")]
+
+# column headers with the answer options they cover
+regime_headers <- setNames(c("Ban (1)", "Medical/research (2–4)", "Specialist shop (5–6)",
+                             "General market (7–9)"), regime_labels)
+
 shifts <- shifts |>
   left_join(drug_blocks, by = "drug") |>
   mutate(drug = factor(drug_labels[drug], levels = rev(drug_labels[drug_order])),
-         demo = factor(word(demo, 1), levels = c("Age", "Education", "Urbanisation", "Vote")),
+         demo = factor(demo_labels[demo], levels = demo_labels),
          regime = factor(regime, levels = regime_labels))
 
 ranges <- shifts |> summarise(lo = min(shift), hi = max(shift), .by = c(block, drug, regime))
 
-# cells that carry the pattern get a light tint in the regime colour
-highlight <- tribble(
-  ~block,                             ~regime,
-  "Ban vs specialist shop",           "ban",
-  "Ban vs specialist shop",           "specialist shop",
-  "Ban vs medical/research",          "ban",
-  "Ban vs medical/research",          "medical/research",
-  "Legal: specialist shop vs market", "specialist shop",
-  "Legal: specialist shop vs market", "general market"
-) |>
-  mutate(block = factor(block, levels = levels(drug_blocks$block)),
-         regime = factor(regime, levels = regime_labels))
-
-# regime colours: the middle option of each group on the viridis scale of the main figure
-regime_colours <- setNames(viridisLite::viridis(9, end = 0.9)[c(1, 3, 6, 8)], regime_labels)
-# demographics: Okabe-Ito, distinct from the regime colours
-demo_colours <- c(Age = "#E69F00", Education = "#56B4E9", Urbanisation = "#009E73", Vote = "#D55E00")
+# demographics: Okabe-Ito, distinct from the viridis regime colours
+demo_colours <- setNames(c("#E69F00", "#56B4E9", "#009E73", "#D55E00"), demo_labels)
 
 p_shifts <- ggplot(shifts, aes(shift, drug)) +
-  geom_rect(data = highlight, aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, fill = regime),
-            inherit.aes = FALSE, alpha = 0.12) +
   geom_vline(xintercept = 0, colour = "grey50", linewidth = 0.3) +
   geom_segment(data = ranges, aes(x = lo, xend = hi, yend = drug), colour = "grey70", linewidth = 1) +
   geom_point(aes(colour = demo, shape = demo), size = 1.8) +
   facet_grid(block ~ regime, scales = "free_y", space = "free_y",
-             labeller = labeller(block = label_wrap_gen(14), regime = str_to_sentence)) +
-  scale_fill_manual(values = regime_colours, guide = "none") +
-  scale_colour_manual(values = demo_colours, name = NULL) +
-  scale_shape_manual(values = c(16, 17, 15, 18), name = NULL) +
-  scale_x_continuous(limits = c(-40, 40), breaks = c(-30, 0, 30)) +
-  labs(x = "← more among young, left, theoretical, urban          more among old, right, practical, rural →\nDifference in percentage points",
-       y = NULL) +
+             labeller = labeller(regime = regime_headers)) +
+  scale_colour_manual(values = demo_colours) +
+  scale_shape_manual(values = setNames(c(16, 17, 15, 18), demo_labels)) +
+  scale_x_continuous(limits = c(-40, 40), breaks = c(-30, 0, 30),
+                     labels = \(x) if_else(x > 0, sprintf("+%d", x), sprintf("%d", x)) |>
+                       str_replace("-", "−")) +
+  guides(colour = guide_legend(nrow = 2, title.position = "left"),
+         shape = guide_legend(nrow = 2, title.position = "left")) +
+  labs(x = "Difference in share choosing this regime (percentage points)", y = NULL,
+       colour = "Positive = more in\nfirst-named group:", shape = "Positive = more in\nfirst-named group:") +
   theme_minimal(base_size = 8) +
   theme(legend.position = "top",
         panel.grid.minor = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.spacing.y = unit(0.8, "lines"),
         strip.text = element_text(face = "bold"),
-        strip.text.y = element_text(angle = 0, hjust = 0))
+        strip.text.y = element_blank())
 
 ggsave(here::here("out", "fig_regime_shifts.pdf"), p_shifts,
        width = 6.5, height = 4.6, device = cairo_pdf)
@@ -221,11 +216,10 @@ caption_shifts <- paste0(
   "substance except alcohol and tobacco. Their counterparts instead favour a specialist shop for cannabis, ",
   "psychedelics and MDMA, and medical or research supply for speed, cocaine and heroin. For alcohol and ",
   "tobacco, right-wing and rural respondents favour a general market over a specialist shop. ",
-  "Each point is the difference in weighted share choosing a regime (percentage points) between two groups: ",
-  "age 50+ vs 18--49; vote right vs left; practical (incl.\\ middle) vs theoretical education; ",
-  "rural (low or no urbanisation) vs urban (high or very high). Positive values: more among the older, ",
-  "right-wing, practically educated or rural group; per drug and demographic the four differences sum to zero. ",
-  "Grey bars span the four demographics; shaded cells mark where the pattern lies. ",
+  "Each point is the difference in weighted share choosing a regime (percentage points) between the two ",
+  "groups named in the legend; per drug and demographic the four differences sum to zero. ",
+  "Practical education includes middle; rural = low or no urbanisation, urban = high or very high. ",
+  "Grey bars span the four demographics. ",
   "Group sizes ($n$, unweighted): ", paste(contrast_n, collapse = "; "), ". ",
   "Vote: parties grouped into left, middle and right (provisional)."
 )

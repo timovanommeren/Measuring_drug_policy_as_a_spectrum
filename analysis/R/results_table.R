@@ -138,37 +138,77 @@ regime_shift <- function(name) {
 shifts <- map(names(contrasts), regime_shift) |> list_rbind()
 stopifnot(all(abs(summarise(shifts, s = sum(shift), .by = c(demo, drug))$s) < 1e-6))
 
-# drugs in the order of the main figure (by weighted % ban), first on top
+# rows grouped by the alternative to a ban that the young/left/theoretical/urban group favours
+drug_blocks <- tribble(
+  ~drug,            ~block,
+  "cannabis",       "Ban vs specialist shop",
+  "psychedelica",   "Ban vs specialist shop",
+  "mdma",           "Ban vs specialist shop",
+  "speed",          "Ban vs medical/research",
+  "cocaine",        "Ban vs medical/research",
+  "heroine",        "Ban vs medical/research",
+  "alcohol",        "Legal: specialist shop vs market",
+  "tabak_en_vapes", "Legal: specialist shop vs market"
+) |>
+  mutate(block = factor(block, levels = unique(block)))
+stopifnot(setequal(drug_blocks$drug, names(drug_labels)), !anyDuplicated(drug_blocks$drug))
+
+# within a block, drugs in the order of the main figure (by weighted % ban), first on top
 drug_order <- long |>
   summarise(ban = sum(w[regime == "ban"]) / sum(w), .by = drug) |>
   arrange(ban) |>
   pull(drug)
 
 shifts <- shifts |>
+  left_join(drug_blocks, by = "drug") |>
   mutate(drug = factor(drug_labels[drug], levels = rev(drug_labels[drug_order])),
-         contrast = factor(contrast, levels = unique(contrast)),
+         demo = factor(word(demo, 1), levels = c("Age", "Education", "Urbanisation", "Vote")),
+         regime = factor(regime, levels = regime_labels))
+
+ranges <- shifts |> summarise(lo = min(shift), hi = max(shift), .by = c(block, drug, regime))
+
+# cells that carry the pattern get a light tint in the regime colour
+highlight <- tribble(
+  ~block,                             ~regime,
+  "Ban vs specialist shop",           "ban",
+  "Ban vs specialist shop",           "specialist shop",
+  "Ban vs medical/research",          "ban",
+  "Ban vs medical/research",          "medical/research",
+  "Legal: specialist shop vs market", "specialist shop",
+  "Legal: specialist shop vs market", "general market"
+) |>
+  mutate(block = factor(block, levels = levels(drug_blocks$block)),
          regime = factor(regime, levels = regime_labels))
 
 # regime colours: the middle option of each group on the viridis scale of the main figure
 regime_colours <- setNames(viridisLite::viridis(9, end = 0.9)[c(1, 3, 6, 8)], regime_labels)
+# demographics: Okabe-Ito, distinct from the regime colours
+demo_colours <- c(Age = "#E69F00", Education = "#56B4E9", Urbanisation = "#009E73", Vote = "#D55E00")
 
-p_shifts <- ggplot(shifts, aes(shift, drug, fill = regime)) +
+p_shifts <- ggplot(shifts, aes(shift, drug)) +
+  geom_rect(data = highlight, aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, fill = regime),
+            inherit.aes = FALSE, alpha = 0.12) +
   geom_vline(xintercept = 0, colour = "grey50", linewidth = 0.3) +
-  geom_col(width = 0.7) +
-  geom_text(aes(label = if_else(abs(shift) >= 15, sprintf("%+.0f", shift), ""),
-                hjust = if_else(shift > 0, -0.15, 1.15)), size = 2) +
-  facet_grid(contrast ~ regime, labeller = labeller(contrast = label_wrap_gen(12), regime = str_to_sentence)) +
+  geom_segment(data = ranges, aes(x = lo, xend = hi, yend = drug), colour = "grey70", linewidth = 1) +
+  geom_point(aes(colour = demo, shape = demo), size = 1.8) +
+  facet_grid(block ~ regime, scales = "free_y", space = "free_y",
+             labeller = labeller(block = label_wrap_gen(14), regime = str_to_sentence)) +
   scale_fill_manual(values = regime_colours, guide = "none") +
-  scale_x_continuous(limits = c(-60, 60), breaks = c(-40, 0, 40)) +
-  labs(x = "Difference in percentage points (positive = more in first-named group)", y = NULL) +
+  scale_colour_manual(values = demo_colours, name = NULL) +
+  scale_shape_manual(values = c(16, 17, 15, 18), name = NULL) +
+  scale_x_continuous(limits = c(-40, 40), breaks = c(-30, 0, 30)) +
+  labs(x = "← more among young, left, theoretical, urban          more among old, right, practical, rural →\nDifference in percentage points",
+       y = NULL) +
   theme_minimal(base_size = 8) +
-  theme(panel.grid.minor = element_blank(),
+  theme(legend.position = "top",
+        panel.grid.minor = element_blank(),
         panel.grid.major.y = element_blank(),
+        panel.spacing.y = unit(0.8, "lines"),
         strip.text = element_text(face = "bold"),
         strip.text.y = element_text(angle = 0, hjust = 0))
 
 ggsave(here::here("out", "fig_regime_shifts.pdf"), p_shifts,
-       width = 6.5, height = 7, device = cairo_pdf)
+       width = 6.5, height = 4.6, device = cairo_pdf)
 
 # n per group in the contrasts, for the caption
 contrast_n <- map_chr(contrasts, \(cn) {
@@ -177,15 +217,19 @@ contrast_n <- map_chr(contrasts, \(cn) {
 })
 
 caption_shifts <- paste0(
-  "Shift in preferred grouped regime between two groups per demographic: age 50+ vs 18--49; ",
-  "vote right vs left; practical (incl.\\ middle) vs theoretical education; ",
-  "rural (low or no urbanisation) vs urban (high or very high). ",
-  "Bars give the difference in weighted share choosing a regime (percentage points; positive = more ",
-  "in the first-named group); per drug the four shifts sum to zero. Drugs are ordered as in ",
-  r"(Figure~\ref{fig:policy_preferences}; values of 15 or more are labelled. )",
+  "Older, right-wing, practically educated and rural respondents more often prefer a ban for every ",
+  "substance except alcohol and tobacco. Their counterparts instead favour a specialist shop for cannabis, ",
+  "psychedelics and MDMA, and medical or research supply for speed, cocaine and heroin. For alcohol and ",
+  "tobacco, right-wing and rural respondents favour a general market over a specialist shop. ",
+  "Each point is the difference in weighted share choosing a regime (percentage points) between two groups: ",
+  "age 50+ vs 18--49; vote right vs left; practical (incl.\\ middle) vs theoretical education; ",
+  "rural (low or no urbanisation) vs urban (high or very high). Positive values: more among the older, ",
+  "right-wing, practically educated or rural group; per drug and demographic the four differences sum to zero. ",
+  "Grey bars span the four demographics; shaded cells mark where the pattern lies. ",
   "Group sizes ($n$, unweighted): ", paste(contrast_n, collapse = "; "), ". ",
   "Vote: parties grouped into left, middle and right (provisional)."
 )
+
 
 writeLines(c(
   r"(\begin{figure}[H])",

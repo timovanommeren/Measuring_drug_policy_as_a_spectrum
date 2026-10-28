@@ -22,31 +22,29 @@ df <- df |>
                             levels = 1:4, labels = regime_labels),
                 .names = "{str_replace(.col, 'beleid_voorkeur_', 'regime_')}"))
 
-# vote recall in 3 groups. PROVISIONAL: to be replaced by each party's position on the
-# Kieskompas TK2025 left-right axis (split into equal thirds); parties without a
-# position (Anders, Blanco, Niet-stemmers) are NA
+# vote recall in 2 groups, left and right; Anders, Blanco and Niet-stemmers are NA
 party_lr <- tribble(
-  ~party,             ~vote_3,
+  ~party,             ~vote_lr,
   "GroenLinks-PvdA",  "left",
   "SP",               "left",
   "PvdD",             "left",
-  "DENK",             "left",
   "Volt",             "left",
-  "D66",              "middle",
-  "CDA",              "middle",
-  "CU",               "middle",
-  "50PLUS",           "middle",
-  "BBB",              "middle",
-  "VVD",              "right",
+  "D66",              "left",
+  "DENK",             "left",
+  "CU",               "left",
   "PVV",              "right",
-  "JA21",             "right",
   "FvD",              "right",
+  "JA21",             "right",
+  "BBB",              "right",
+  "VVD",              "right",
+  "CDA",              "right",
+  "50PLUS",           "right",
   "SGP",              "right"
 )
 
 df <- df |>
-  mutate(vote_3 = factor(party_lr$vote_3[match(as.character(vote_recall_rec), party_lr$party)],
-                         levels = c("left", "middle", "right")))
+  mutate(vote_lr = factor(party_lr$vote_lr[match(as.character(vote_recall_rec), party_lr$party)],
+                          levels = c("left", "right")))
 
 des <- survey::svydesign(ids = ~1, weights = ~w, data = df)
 

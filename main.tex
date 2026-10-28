@@ -2,8 +2,6 @@
 % Compile on Overleaf with pdfLaTeX (default) -- biber runs automatically.
 \documentclass[11pt,a4paper]{article}
 
-
-
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
@@ -74,50 +72,7 @@
 \end{enumerate}
 
 
-\begin{table}[htbp]
-\centering
-\small
-% 1) Build the 15-item block first so its height can be measured
-\sbox\itembox{%
-\begin{tabular}[c]{@{}P{\wrat}P{\witem}P{\wtyp}@{}}
-a) binding morals & Drugsgebruik is slecht voor de normen en waarden van onze samenleving. & Norm \\ \addlinespace[2pt]
-b) deterrence effect & Als de verkoop van bepaalde drugs wordt toegestaan, zullen deze drugs meer gebruikt worden. & Relation \\ \addlinespace[2pt]
-c) law-and-order & De politie moet meer tijd aan het bestrijden van het drugsprobleem & Policy \\ \addlinespace[2pt]
-d) self-medication & Mensen die medicijnen illegaal kopen, doen dat omdat ze echt klachten hebben. & Relation \\ \addlinespace[2pt]
-e) harm reduction & Als een achttienjarige die ik goed ken XTC wil nemen, zou ik zeggen: laat de pil eerst testen. & Action tendency \\ \addlinespace[2pt]
-f) care-accessibility & Als de verkoop van drugs wordt toegestaan, komen mensen met een drugsprobleem makkelijker bij de juiste hulp terecht. & Relation \\ \addlinespace[2pt]
-g) product safety & Drugsgebruik is minder gevaarlijk als de verkoop wordt toegestaan. & Relation \\ \addlinespace[2pt]
-h) organised crime & Er zou in Nederland minder criminaliteit zijn als de verkoop van drugs wordt toegestaan. & Relation \\ \addlinespace[2pt]
-i) international & We krijgen problemen met andere landen, als Nederland de verkoop van drugs toestaat. & Evaluative belief \\ \addlinespace[2pt]
-j) curiosity & Als iemand een drug heeft gebruikt die ik niet ken, zou ik ernaar vragen. & Action tendency \\ \addlinespace[2pt]
-k) commercialisation & Winkels die winst mogen maken, houden mensen beter weg bij de dealer dan winkels zonder winst. & Evaluative belief \\ \addlinespace[2pt]
-l) availability & Hoeveel winkels alcohol verkopen, maakt niet uit voor hoeveel mensen drinken. & Relation \\ \addlinespace[2pt]
-m) normalisation & Jongeren komen makkelijker aan drugs als de verkoop wordt toegestaan. & Relation \\ \addlinespace[2pt]
-n) risk-taking & Ik neem weleens een drankje of drug aan van iemand die ik niet goed ken. & Behaviour \\ \addlinespace[2pt]
-o) individualising morals & Mensen mogen zelf beslissen of ze ongezonde middelen gebruiken. & Norm
-\end{tabular}}%
-\setlength\itemheight{\dimexpr\ht\itembox+\dp\itembox\relax}%
-% 2) Outer table: the policy column gets exactly that height
-\begin{tabular}{@{}P{\wpol}P{\wrat}P{\witem}P{\wtyp}@{}}
-\toprule
-\textbf{Policy} & \textbf{Rationale} & \textbf{Item} & \textbf{Type} \\
-\midrule
-\parbox[c][\itemheight][s]{\wpol}{\raggedright
-  \pol{Verbod}                                \hrule
-  \pol{Alleen voor onderzoek}                 \hrule
-  \pol{Alleen als behandeling}                \hrule
-  \pol{Alleen op recept}                      \hrule
-  \pol{Alleen in speciaalzaak, zonder winst}  \hrule
-  \pol{Alleen in speciaalzaak, met winst}     \hrule
-  \pol{Overal te koop, zonder reclame}        \hrule
-  \pol{Overal te koop, met reclame}           \hrule
-  \pol{Vrije verkoop}}
-  & \multicolumn{3}{l@{}}{\usebox\itembox} \\
-\midrule
- & p) double standard & Verboden harddrugs zijn ongezonder dan alcohol en tabak. & Judgment \\
-\bottomrule
-\end{tabular}
-\end{table}
+
 
 However, to date no instrument measures the full structure of beliefs, feelings and behaviour underlying drug regulation preferences \parencite[but see][]{greer2019,wilkins2022,hamrak2026}. Similarly, to date no instrument has been developed that measures drug policy preferences as an ordered set of regulatory models per substance. Combining the two yields support for seven regulatory models across nine substances together with the attitude dynamics behind them, usable for instance in public health campaigns.
 
@@ -129,6 +84,12 @@ However, to date no instrument measures the full structure of beliefs, feelings 
   \caption{The nine answer options and their grouping into four regimes.}
   \label{fig:policy_scale}
 \end{figure}
+
+\textbf{cosmopolitan–communitarian divide} 
+
+\begin{enumerate}
+    \item Trust in expertise vs not
+\end{enumerate}
 
 
 \section{Methods}

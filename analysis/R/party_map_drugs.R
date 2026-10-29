@@ -220,16 +220,13 @@ plot_map <- function(split, measure, xlim, ylim, logo_scale = 1, quad_size = 3.6
   data <- party_map(split, measure)
   # the panel is about 9.3 x 4.6 inches on the 11 x 7 page
   if (m$stat %in% c("mode", "mean_mode")) data <- spread_in_cells(data, aspect = (9.3 / diff(xlim)) / (4.6 / diff(ylim)))
-  # logos moved apart on a panel of `repel_mm` (width, height in mm); a dot marks each party's own
-  # position, with a line to its logo when it moved
+  # logos moved apart on a panel of `repel_mm` (width, height in mm), with a line from the party's own
+  # position to its logo when it moved
   repel_layers <- NULL
   if (!is.null(repel_mm)) {
     data <- repel_logos(data, xlim, ylim, repel_mm, logo_scale)
     moved <- filter(data, abs(x - x0) / diff(xlim) * repel_mm[1] > 1 | abs(y - y0) / diff(ylim) * repel_mm[2] > 1)
-    repel_layers <- list(
-      geom_segment(data = moved, aes(x0, y0, xend = x, yend = y), colour = "grey55", linewidth = 0.25),
-      geom_point(data = moved, aes(x0, y0), size = 0.6, colour = "grey30")
-    )
+    repel_layers <- geom_segment(data = moved, aes(x0, y0, xend = x, yend = y), colour = "grey55", linewidth = 0.25)
   }
   ref <- sample_ref(split, measure)
   # mode: thin lines between the answer cells

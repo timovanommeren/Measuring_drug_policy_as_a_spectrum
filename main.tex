@@ -8,6 +8,9 @@
 \usepackage{textcomp}
 \usepackage[english]{babel}
 \usepackage{csquotes}
+\usepackage{newunicodechar}
+\usepackage{natbib}
+\newunicodechar{́}{\'{}}
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{graphicx}
 \usepackage{float}
@@ -66,17 +69,19 @@
 % ---------------------------------------------------------------------------
 \section{Introduction}
 
-\begin{enumerate}
-    \item One opening paragraph describing current changes regulation worldwide and Netherlands specifically
-    \item ...
-\end{enumerate}
+\textbf{Shifting regulation worldwide and in the Netherlands} Regulatory models which were unthinkable decades ago are now in place: commercial legalization of cannabis in many US states and a ban on tobacco sales to anybody born after 2008 in the UK \parencite{tobaccovapesact2026}.
 
+\textbf{Shifting attitudes towards regulation worldwide and in the Netherlands} Attitudes towards the regulation of psychoactive substances seem to be changing in the West \parencite{felson2019,gallup2023}. 
 
+\textbf{No proper attitude research trying to understsand this shift} As described above, the public is usually consulted in impoverished terms. And government communication is sometimes counterproductive \parencite[e.g., messaging that presents drug use as normalised may increase use,][]{vanwingerde2023}. How we discuss drug regulation matters: in an Irish citizens' assembly 85\% rejected the status quo, 58.6\% chose a hybrid of different approaches for different drugs, and no universal option drew more than 18.4\% \parencite{citizensassembly2024}.
 
+To date no instrument measures the full structure of beliefs, feelings and behaviour underlying drug regulation preferences \parencite[but see][]{greer2019,wilkins2022,hamrak2026}. Similarly, to date no instrument has been developed that measures drug policy preferences as an ordered set of regulatory models per substance. Combining the two yields support for seven regulatory models across nine substances together with the attitude dynamics behind them, usable for instance in public health campaigns.
 
-However, to date no instrument measures the full structure of beliefs, feelings and behaviour underlying drug regulation preferences \parencite[but see][]{greer2019,wilkins2022,hamrak2026}. Similarly, to date no instrument has been developed that measures drug policy preferences as an ordered set of regulatory models per substance. Combining the two yields support for seven regulatory models across nine substances together with the attitude dynamics behind them, usable for instance in public health campaigns.
+\textbf{The scale} Drug regulation is inherently multidimensional. For example, more prohibitive policies go hand in hand with more punitive measures (cite?). Nonetheless, we've tried to formulate a unidimensional, and, crucially, a strictly ordinal, scale. Following table ... in \citet{maccoun2001}, we define the main dimension of drug regulation as the policy's 'restrictiveness'. This led to the nine options shown in figure \ref{fig:policy_scale}.
 
-\textbf{For Dutch society.} Attitudes towards the regulation of psychoactive substances seem to be changing in the West \parencite{felson2019,gallup2023}. Regulatory models which were unthinkable decades ago are now in place: commercial legalization of cannabis in many US states and a ban on tobacco sales to anybody born after 2008 in the UK \parencite{tobaccovapesact2026}. As described above, the public is usually consulted in impoverished terms. And government communication is sometimes counterproductive \parencite[e.g., messaging that presents drug use as normalised may increase use,][]{vanwingerde2023}. How we discuss drug regulation matters: in an Irish citizens' assembly 85\% rejected the status quo, 58.6\% chose a hybrid of different approaches for different drugs, and no universal option drew more than 18.4\% \parencite{citizensassembly2024}. Drug regulation requires steady deliberation and incremental steps \parencite{maccoun2001}.
+Four other dimensions formed the basis of the attitude beliefs: crime, addiction, the consequences of allowing the sale of drugs, and how drugs fit into society. Belief items were also 
+
+For developing our attitude items, we draw on \cite{saris2004}'s typology of basic concepts-by-intuition, which links the concepts measured in surveys to the linguistic structure of the assertions used to measure them. Evaluations such as "The war on drugs is a failure" have been found to be good predictors of policy stance \parencite{bergquist2022}. However, this may simply reflect their conceptual proximity to the outcome \parencite{vysevkova2026}. Another complicating factor is that people may support a certain causal belief not because they actually believe this but rather as a way to support a norm. For example, support for the effectiveness of punitive measures seems to be driven more by the belief that something must be done, than actually believing that crime will then decrease (cite) \parencite{ajzen1977}.
 
 \begin{figure}[H]
   \centering
@@ -84,12 +89,6 @@ However, to date no instrument measures the full structure of beliefs, feelings 
   \caption{The nine answer options and their grouping into four regimes.}
   \label{fig:policy_scale}
 \end{figure}
-
-\textbf{cosmopolitan–communitarian divide} 
-
-\begin{enumerate}
-    \item Trust in expertise vs not
-\end{enumerate}
 
 
 \section{Methods}
@@ -115,7 +114,12 @@ However, to date no instrument measures the full structure of beliefs, feelings 
 \input{out/fig_policy_preferences}
 
 % TODO Timo: check wording
-The demographic divide is less about whether to regulate than about how (Figure~\ref{fig:gradient}). Support for a ban on the currently illegal substances rises with age, falls with education and runs from left to right; for MDMA from 24\% among 18--34-year-olds to 72\% among those aged 65 and over, from 29\% among the theoretically to 72\% among the practically educated, and from 23\% among left-wing via 39\% among centrist to 61\% among right-wing voters. Urbanisation matters less (43\% in urban, 53\% in less urban areas). Groups that less often choose a ban do not move towards an open market, but towards a specialist shop for cannabis, psychedelics and MDMA, and towards research or treatment for speed, cocaine and heroin. Alcohol is hardly ever banned; there the divide runs between a specialist shop and a general market, which left-wing voters choose about equally often (51\% and 45\%) and right-wing voters favour the market (66\%).
+
+A common patterns seems to hold across most drugs and demographics (Figure~\ref{fig:gradient}, except for sex which is therefore excluded). Younger, theoretically educated, urban and left-wing respondents converge on regulated options (specialist shops for cannabis, psychedelics and MDMA; medical supply for speed, cocaine and heroin). Older, practically educated, less urban and right-wing respondents differentiate more sharply between drugs, broadly in line with their current legal status: more support for a ban on illicit drugs and, among right-wing voters, more support for free market sale of alcohol and tobacco. Age and education mainly shape support for a ban of currently illegal drugs. The right-left divide most clearly separates market from specialist-shop support for the legal drugs. Urbanization shows this pattern the least. 
+
+
+
+% Support for a ban on the currently illegal substances rises with age, falls with education and runs from left to right; for MDMA from 24\% among 18--34-year-olds to 72\% among those aged 65 and over, from 29\% among the theoretically to 72\% among the practically educated, and from 23\% among left-wing via 39\% among centrist to 61\% among right-wing voters. Urbanisation matters less (43\% in urban, 53\% in less urban areas). Groups that less often choose a ban do not move towards an open market, but towards a specialist shop for cannabis, psychedelics and MDMA, and towards research or treatment for speed, cocaine and heroin. Alcohol is hardly ever banned; there the divide runs between a specialist shop and a general market, which left-wing voters choose about equally often (51\% and 45\%) and right-wing voters favour the market (66\%).
 
 \input{out/fig_gradient_grid}
 
@@ -129,37 +133,19 @@ Figure~\ref{fig:party_map} places the parties by their support for strict regula
 
 % Indeed, in our pilots, \textit{Het is verstandig om heroïne te geven aan mensen die eraan verslaafd zijn} was found to be the strongest predictor of support for legalization of hard drugs. But was removed in favour of assertions expressing support for specific interventions or consequence beliefs: \textit{Als een achtienjarige die ik goed ken XTC wil nemen, zou ik zeggen: laat de pil eerst testen.} and \textit{Als de verkoop van drugs wordt toegestaan, komen mensen met een drugsprobleem makkelijker bij de juiste hulp terecht.} \parencite{ajzen1977}.
 
+\section{Conclusion}
+
+One way to think about the demographic divide in the data is as a universalism-particularism divide \parencite{damhuis2024cleavage}: "Liberal – in our parlance: universalist – attitudes have been characterized as marked by moral concerns for the well-being of others (Miles and Vaisey 2015), the critical non-reification of the status quo of cultural practices (Elchardus and Spruyt 2009) and permissiveness (see also  Figure 1. Three elements of a cleavage: social structure, group identifications and shared moral outlooks, and their reinforcement by parties’ differing ideological supply (our elaboration, based on Bartolini and Mair 1990; Lipset and Rokkan 1967; Bornschier 2010). Broćić and Miles 2021). [...] Zollinger reconstructs that far right voters’ self-descriptions typically center on ‘the dignity of a simple, honest life built around selfreliance on hard work and common sense, whereas new left voters highlight their self-perceived openness, tolerance, dynamism, and unorthodox lifestyle’ (ibid., 19)" 
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{table_commonsense_cleavage.png}
+    \caption{Ideological vs common sense political reasoning.}
+    \label{fig:placeholder}
+\end{figure}
 
 
-\begin{table}[ht]
-\centering\small
-\caption{Pilot statistics of the items in the item table (new items have none).}
-\label{tab:items}
-\begin{tabular}{l>{\raggedright\arraybackslash}p{7.5cm}rrrr}
-\toprule
-& Item & item-rest & $b_{\mathit{il}}$ & $b_{\mathit{le}}$ & $r_{\mathit{inv}}$ \\
-\midrule
-A) & \itemtext{A} & \rrest{A} & \bil{A} & \ble{A} & \rinv{A} \\
-B) & \itemtext{B} & \rrest{B} & \bil{B} & \ble{B} & \rinv{B} \\
-C) & \itemtext{C} & \rrest{C} & \bil{C} & \ble{C} & \rinv{C} \\
-D) & \itemtext{D} & \rrest{D} & \bil{D} & \ble{D} & \rinv{D} \\
-E) & \itemtext{E} & \rrest{E} & \bil{E} & \ble{E} & \rinv{E} \\
-F) & \itemtext{F} & \rrest{F} & \bil{F} & \ble{F} & \rinv{F} \\
-G) & \itemtext{G} & \rrest{G} & \bil{G} & \ble{G} & \rinv{G} \\
-H) & \itemtext{H} & \rrest{H} & \bil{H} & \ble{H} & \rinv{H} \\
-I) & \itemtext{I} & \rrest{I} & \bil{I} & \ble{I} & \rinv{I} \\
-J) & \itemtext{J} & \rrest{J} & \bil{J} & \ble{J} & \rinv{J} \\
-K) & \itemtext{K} & \rrest{K} & \bil{K} & \ble{K} & \rinv{K} \\
-L) & \itemtext{L} & \rrest{L} & \bil{L} & \ble{L} & \rinv{L} \\
-M) & \itemtext{M} & \rrest{M} & \bil{M} & \ble{M} & \rinv{M} \\
-N) & \itemtext{N} & \rrest{N} & \bil{N} & \ble{N} & \rinv{N} \\
-O) & \itemtext{O} & \rrest{O} & \bil{O} & \ble{O} & \rinv{O} \\
-P) & \itemtext{P} & \rrest{P} & \bil{P} & \ble{P} & \rinv{P} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-
+Importantly, most lay people do not reason in all-encompassing ideological terms. Rather, we consider this divide as providing heuristics for laypeople to reason about complex topics. 
 
 
 
@@ -167,12 +153,27 @@ P) & \itemtext{P} & \rrest{P} & \bil{P} & \ble{P} & \rinv{P} \\
 
 \section{Discussion}
 
+
+
+
 \begin{enumerate}
-    \item This is a null meting. Future work may explore experimental applications. For example, there is a status-quo bias. People might not be familiar with the status quo. It would interesting to see the effect of simply sharing the status quo with people. 
+    \item new cleavage in Netherlands and europe?
+    \item Drug regulation requires steady deliberation and incremental steps \parencite{maccoun2001}.
+\end{enumerate}
+
+
+\subsection{Limitations and Future Directions}
+
+\textbf{limitations}
+\begin{enumerate}
     \item The attitudes items don't explain currently legal drugs well. In part perhaps because we are missing arguments in favour of commercialisation, beyond competing with the illicit market. In other words, why don't people want to go to government stores for alcohol? Out of laziness? Distrust of the government? 
 \end{enumerate}
 
-- 
+
+\textbf{future directions}
+\begin{enumerate}
+    \item This is a null meting. Future work may explore experimental applications. For example, there is a status-quo bias. People might not be familiar with the status quo. It would interesting to see the effect of simply sharing the status quo with people. 
+\end{enumerate}
 
 
 

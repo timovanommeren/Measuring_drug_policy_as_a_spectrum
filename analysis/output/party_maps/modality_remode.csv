@@ -1,0 +1,105 @@
+group,drug,n,rated,modes,modes_binom,modes_weighted,locations,p_values,bayes_factors,stable_until
+D66,alcohol,233,1,2,1,1,7 1,0 0.0028,Inf 22,90
+D66,tabak_en_vapes,233,2,2,2,2,6 1,0 0,Inf Inf,90
+D66,cannabis,234,2,2,2,1,6 1,0 0.0017,Inf 34,30
+D66,psychedelica,233,3,4,3,2,1 5 3 9,0 2e-04 0.0083 0.04,Inf 220 9.2 2.7,30
+D66,mdma,233,2,3,2,2,1 5 9,0 0 0,Inf Inf Inf,80
+D66,cocaine,232,1,2,1,1,1 9,0 0,Inf Inf,90
+D66,speed,231,1,2,1,1,1 9,0 0,Inf Inf,90
+D66,heroine,232,1,2,1,1,1 9,0 0,Inf Inf,90
+PVV,alcohol,123,1,2,1,2,8 1,0 9e-04,Inf 58,90
+PVV,tabak_en_vapes,124,2,2,2,2,6 1,0 0,Inf Inf,80
+PVV,cannabis,125,3,3,2,3,3 1 9,0 0 0.027,Inf Inf 3.7,70
+PVV,psychedelica,124,1,2,1,2,1 9,0 0,Inf Inf,90
+PVV,mdma,123,1,2,1,2,1 9,0 4e-04,Inf 120,90
+PVV,cocaine,124,1,2,1,2,1 9,0 0,Inf Inf,90
+PVV,speed,125,1,2,1,2,1 9,0 0.036,Inf 3,90
+PVV,heroine,125,1,2,1,2,1 9,0 0.011,Inf 7.4,90
+VVD,alcohol,132,1,2,1,2,7 1,0 0,Inf Inf,90
+VVD,tabak_en_vapes,132,2,2,2,2,6 1,0 0,Inf Inf,80
+VVD,cannabis,131,2,2,2,2,6 1,0 1e-04,Inf 400,50
+VVD,psychedelica,131,2,2,2,2,1 6,0 0.019,Inf 4.9,20
+VVD,mdma,131,2,2,2,2,1 6,0 0,Inf Inf,70
+VVD,cocaine,132,1,1,1,1,1,0,Inf,90
+VVD,speed,132,1,1,1,1,1,0,Inf,90
+VVD,heroine,132,1,1,1,1,1,0,Inf,90
+GroenLinks-PvdA,alcohol,240,1,2,2,2,6 1,0 2e-04,Inf 220,10
+GroenLinks-PvdA,tabak_en_vapes,240,2,2,2,2,5 1,0 0,Inf Inf,90
+GroenLinks-PvdA,cannabis,239,1,2,1,1,5 1,0 0.03,Inf 3.4,90
+GroenLinks-PvdA,psychedelica,240,2,3,2,2,5 1 9,0 0 0,Inf Inf Inf,80
+GroenLinks-PvdA,mdma,239,2,3,2,2,1 5 9,0 0 0,Inf Inf Inf,90
+GroenLinks-PvdA,cocaine,239,2,1,1,1,1,0,Inf,90
+GroenLinks-PvdA,speed,238,2,2,2,2,1 3,0 0.0078,Inf 9.6,20
+GroenLinks-PvdA,heroine,240,2,2,2,1,1 3,0 0.0097,Inf 8.1,20
+Other party,alcohol,73,2,2,1,2,7 1,0 0,Inf Inf,80
+Other party,tabak_en_vapes,74,2,2,2,2,1 5,0 0,Inf Inf,70
+Other party,cannabis,74,2,2,2,2,1 5,0 0,Inf Inf,60
+Other party,psychedelica,73,3,1,1,2,1,0,Inf,80
+Other party,mdma,72,2,1,1,2,1,0,Inf,80
+Other party,cocaine,74,1,1,1,1,1,0,Inf,90
+Other party,speed,74,1,1,1,1,1,0,Inf,80
+Other party,heroine,74,1,1,1,1,1,0,Inf,90
+BBB,alcohol,32,1,1,1,1,7,0,Inf,60
+BBB,tabak_en_vapes,33,3,2,2,2,1 6,0 6e-04,Inf 83,10
+BBB,cannabis,32,2,2,2,2,6 1,1e-04 0.0011,400 49,10
+BBB,psychedelica,33,3,2,1,2,1 9,0 0,Inf Inf,50
+BBB,mdma,32,3,1,1,1,1,0,Inf,70
+BBB,cocaine,33,3,1,1,1,1,0,Inf,70
+BBB,speed,33,2,1,1,1,1,0,Inf,60
+BBB,heroine,33,1,1,1,1,1,0,Inf,70
+Did not vote / blank,alcohol,63,1,2,1,3,7 1,0 0.004,Inf 17,70
+Did not vote / blank,tabak_en_vapes,63,2,2,2,2,6 1,0 0,Inf Inf,60
+Did not vote / blank,cannabis,64,2,2,2,2,6 1,0 1e-04,Inf 400,50
+Did not vote / blank,psychedelica,64,2,1,1,1,1,0,Inf,70
+Did not vote / blank,mdma,63,1,1,1,1,1,0,Inf,80
+Did not vote / blank,cocaine,63,1,1,1,1,1,0,Inf,80
+Did not vote / blank,speed,63,1,1,1,1,1,0,Inf,80
+Did not vote / blank,heroine,63,1,1,1,1,1,0,Inf,80
+FvD,alcohol,37,2,1,1,1,8,0,Inf,60
+FvD,tabak_en_vapes,37,2,2,1,2,6 1,0 0.015,Inf 5.8,60
+FvD,cannabis,36,2,2,1,2,6 9,0 0,Inf Inf,50
+FvD,psychedelica,35,2,2,2,2,1 6,0 0,Inf Inf,40
+FvD,mdma,36,2,2,2,2,1 6,0 0.0066,Inf 11,10
+FvD,speed,37,3,2,1,2,1 6,0 0.001,Inf 53,80
+FvD,heroine,37,1,1,1,1,1,0,Inf,80
+CDA,alcohol,114,1,2,1,1,7 1,0 0,Inf Inf,90
+CDA,tabak_en_vapes,114,2,2,2,2,6 1,0 0,Inf Inf,80
+CDA,cannabis,114,2,2,1,1,6 1,0 0.037,Inf 2.9,80
+CDA,psychedelica,114,1,2,1,1,1 9,0 0,Inf Inf,80
+CDA,mdma,114,1,2,1,2,1 9,0 0,Inf Inf,90
+CDA,cocaine,114,1,2,1,2,1 9,0 0,Inf Inf,90
+CDA,speed,114,1,1,1,1,1,0,Inf,90
+CDA,heroine,114,2,1,1,1,1,0,Inf,90
+SP,alcohol,42,2,1,1,1,7,0,Inf,70
+SP,tabak_en_vapes,42,2,2,2,2,5 1,0 0,Inf Inf,30
+SP,cannabis,42,2,2,1,3,6 1,0 0.004,Inf 17,60
+SP,psychedelica,42,2,1,1,1,6,0,Inf,50
+SP,mdma,42,3,1,1,2,5,0,Inf,50
+SP,cocaine,42,3,1,1,1,1,0,Inf,60
+SP,speed,42,1,1,1,1,1,0,Inf,50
+SP,heroine,42,2,1,1,1,1,0,Inf,60
+JA21,alcohol,78,1,1,1,1,8,0,Inf,80
+JA21,tabak_en_vapes,78,2,2,2,2,6 1,0 0,Inf Inf,70
+JA21,cannabis,79,3,2,2,3,6 1,0 0.0039,Inf 17,20
+JA21,psychedelica,78,2,1,1,1,1,0,Inf,80
+JA21,mdma,77,2,2,2,2,1 5,0 0.007,Inf 11,20
+JA21,cocaine,79,1,1,1,1,1,0,Inf,90
+JA21,speed,77,2,1,1,2,1,0,Inf,90
+JA21,heroine,78,1,1,1,1,1,0,Inf,90
+FvD,cocaine,35,3,2,1,2,1 9,0 0,Inf Inf,70
+PvdD,alcohol,36,1,1,1,1,6,0,Inf,60
+PvdD,tabak_en_vapes,36,2,2,2,2,5 1,0 0,Inf Inf,50
+PvdD,cannabis,36,1,1,1,1,5,0,Inf,60
+PvdD,psychedelica,36,1,2,2,2,5 1,0 0,Inf Inf,40
+PvdD,mdma,36,2,2,2,2,5 1,0 3e-04,Inf 150,50
+PvdD,cocaine,36,3,1,1,1,1,0,Inf,70
+PvdD,speed,35,3,1,1,2,1,0,Inf,60
+PvdD,heroine,36,1,1,1,1,1,0,Inf,70
+Volt,alcohol,28,1,1,1,1,7,0,Inf,40
+Volt,tabak_en_vapes,28,2,2,2,2,6 1,0 1e-04,Inf 400,30
+Volt,cannabis,28,2,2,1,2,6 3,0 0,Inf Inf,60
+Volt,psychedelica,28,2,1,1,1,5,0,Inf,40
+Volt,mdma,27,3,2,1,1,5 1,0 0.024,Inf 4,50
+Volt,cocaine,28,2,1,1,1,1,0,Inf,60
+Volt,speed,28,2,1,1,1,1,1e-04,400,30
+Volt,heroine,28,2,1,1,1,1,0,Inf,70

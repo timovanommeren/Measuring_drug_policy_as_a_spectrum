@@ -1,0 +1,27 @@
+group,axis,mean_drug_modes,multimodal_drugs,drugs,axis_modes,axis_modes_weighted,pattern
+D66,y,2,2,2,1,1,"drugs multimodal, axis not"
+D66,x,2.5,6,6,2,1,consistent
+PVV,y,2,2,2,2,2,consistent
+PVV,x,2.1666666666666665,6,6,2,2,consistent
+VVD,y,2,2,2,3,3,consistent
+VVD,x,1.5,3,6,1,1,"drugs multimodal, axis not"
+GroenLinks-PvdA,y,2,2,2,2,2,consistent
+GroenLinks-PvdA,x,2.1666666666666665,5,6,1,1,"drugs multimodal, axis not"
+Other party,y,2,2,2,2,2,consistent
+Other party,x,1.1666666666666667,1,6,1,1,consistent
+BBB,y,1.5,1,2,1,1,"drugs multimodal, axis not"
+BBB,x,1.3333333333333333,2,6,1,1,consistent
+Did not vote / blank,y,2,2,2,2,2,consistent
+Did not vote / blank,x,1.1666666666666667,1,6,1,1,consistent
+FvD,y,1.5,1,2,1,1,"drugs multimodal, axis not"
+FvD,x,1.8333333333333333,5,6,1,1,"drugs multimodal, axis not"
+CDA,y,2,2,2,1,2,"drugs multimodal, axis not"
+CDA,x,1.6666666666666667,4,6,1,1,"drugs multimodal, axis not"
+SP,y,1.5,1,2,1,1,"drugs multimodal, axis not"
+SP,x,1.1666666666666667,1,6,1,1,consistent
+JA21,y,1.5,1,2,2,2,consistent
+JA21,x,1.3333333333333333,2,6,1,1,consistent
+PvdD,y,1.5,1,2,2,1,consistent
+PvdD,x,1.3333333333333333,2,6,2,1,"axis multimodal, drugs mostly not"
+Volt,y,1.5,1,2,1,2,"drugs multimodal, axis not"
+Volt,x,1.3333333333333333,2,6,1,1,consistent

@@ -27,7 +27,7 @@ analysis/
   ratings/                     hand ratings used by exploratory/modality/ (tracked)
   assets/                      codebook and party logos
   icons/                       icons of the nine answer options (as shown in the survey)
-  output/                      output of the exploratory scripts (not tracked, regenerate locally)
+  output/                      output of the exploratory and appendix scripts (tracked, except .rds)
 ```
 
 Every script sources `00_load_and_clean.R` itself, so each can be run on its own, from the project root
@@ -62,7 +62,8 @@ the CBS boundaries to `analysis/data/coropgebied.geojson` if missing).
 ## Data
 
 The repository is public, so the survey data are **never committed** (`.gitignore` excludes
-`analysis/data/`, `*.sav` and csv files under `analysis/`). Ask Timo van Ommeren for
+`analysis/data/`, `*.sav`, `*.rds` and csv files under `analysis/` other than aggregated results in
+`analysis/ratings/` and `analysis/output/`). Keep it that way when adding output: only aggregates. Ask Timo van Ommeren for
 `NLOZ26-10_Drugsbeleid_gedeeld_261022.sav`. The variable codebook is in `analysis/assets/`.
 
 Conventions used throughout (set in `00_load_and_clean.R`):
@@ -74,7 +75,9 @@ Conventions used throughout (set in `00_load_and_clean.R`):
 ## Exploratory analyses
 
 `analysis/R/exploratory/` holds analyses that informed the paper but are not in it. They write to
-`analysis/output/` (not tracked) and may need extra packages.
+`analysis/output/` and may need extra packages. The output is tracked so collaborators can browse it
+without running anything; fitted model objects (`.rds`) are not, because they contain the
+respondent-level data.
 
 | Script | What it does | Extra packages |
 |---|---|---|

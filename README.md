@@ -10,6 +10,7 @@ position themselves on the illicit versus the legal drugs.
 
 ```
 main.tex, references.bib       manuscript (compiled on Overleaf, which syncs with this repo)
+main.pdf                       compiled manuscript, for reading without compiling (may lag behind main.tex)
 out/                           everything R generates for the paper: figures (.pdf) and LaTeX
                                snippets (.tex) that main.tex \input's. Tracked in git.
 figures/                       figures made by hand (not by R)

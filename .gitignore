@@ -28,7 +28,6 @@ Rplots.pdf
 *.out
 *.run.xml
 *.synctex.gz
-main.pdf
 
 # Office lock files
 ~$*

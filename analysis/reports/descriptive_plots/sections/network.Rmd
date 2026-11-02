@@ -1,0 +1,49 @@
+```{r setup-network, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 7, dpi = 110)
+```
+
+```{=html}
+<hr>
+<h1 id="network">Network: which associations survive conditioning?</h1>
+
+<div class="block-box">
+<strong>What a network estimates.</strong> Each variable is a node; an edge is
+the association between two nodes <em>after conditioning on every other node in
+the model</em>. That is the difference from the correlation screen above: a
+correlation between two items can be produced entirely by a third, and an edge
+survives only if the pair still covaries once the rest are held constant.
+<br><br>
+<strong>Mixed graphical model.</strong> Nodes are of different types here -
+continuous sliders and categorical answers - so the model is fitted with
+<code>mgm</code> (Haslbeck &amp; Waldorp, 2020), which estimates each node from
+the others by regularised regression on the scale that node calls for.
+Regularisation means small edges are set to exactly zero rather than shrunk,
+so the graph is already a selection.
+<br><br>
+<strong>The ring around each node</strong> is its predictability (Haslbeck &amp;
+Waldorp, 2018): how much of that node the rest of the network accounts for,
+<em>R</em><sup>2</sup> for continuous nodes and normalised accuracy for
+categorical ones. A node with a thin ring is one the network says little about.
+<br><br>
+<strong>Edge stability</strong> re-estimates the model on bootstrap samples and
+counts how often each edge survives. The column to read is
+<code>propLtZ</code>: the proportion of resamples in which the edge was set to
+zero. A high value means the edge is not reliably there.
+<br><br>
+<strong>Which respondents.</strong> <code>mgm</code> rejects missing values, so
+the model is fitted on complete cases. Every missing value here is a
+&ldquo;Geen mening&rdquo; answer on a policy slider - a real response option,
+not a skipped question - so this drops the respondents most ambivalent about
+those substances.
+</div>
+```
+```{=html}
+<div class="block-box"><p><strong>Not configured for the main study.</strong>
+The pilots' node list named the first pilot's variables one by one. The main
+study replaced the belief items, asks own use per substance group and has a
+different emotion question, so that list does not apply and no network is
+estimated here.</p>
+<p>Which nodes belong in a network is a substantive choice, so it needs its own
+node list rather than an automatic translation.</p></div>
+```

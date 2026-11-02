@@ -1,0 +1,347 @@
+---
+title: "Main study inspection: descriptive plots per survey item"
+subtitle: 'Attitudes towards drug policy -- full main study, delivered 22 October 2026'
+author: "Timo van Ommeren"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    code_folding: hide
+    df_print: kable
+    section_divs: false
+---
+
+```{r setup, include=FALSE}
+# Global knitr options: hide code by default (a supervisor sees plots, not
+# code), and suppress package start-up noise from the plot chunks.
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  dpi = 110,
+  dev = if (requireNamespace("svglite", quietly = TRUE)) "svglite" else "svg"
+)
+
+# here::here() anchors every path to the repository root (drug_policy_spectrum.Rproj),
+# so this knits and also runs chunk-by-chunk from a fresh session.
+library(here)
+
+# The data layer builds `pilot` and everything the sections in sections/ use.
+source(here("analysis", "reports", "descriptive_plots", "R", "data.R"))
+# cached chunks are keyed to the data they read
+knitr::opts_chunk$set(cache.extra = tools::md5sum(unlist(DELIVERY[c("completed", "in_progress")])))
+```
+
+
+```{=html}
+<style>
+/* intro "box" shown at the top of every block */
+.block-box{
+  border:1px solid #d0d7de;
+  border-left:5px solid #3B6EA5;
+  background:#f6f8fa;
+  padding:10px 16px;
+  margin:12px 0 18px;
+  border-radius:5px;
+}
+.block-box > :first-child{ margin-top:0; }
+.block-box > :last-child{ margin-bottom:0; }
+/* the SD / mean ordering toggle button */
+.sort-btn{
+  display:inline-block; margin-top:10px;
+  background:#3B6EA5; color:#fff; border:none;
+  padding:6px 12px; border-radius:4px; cursor:pointer; font-size:0.85em;
+}
+.sort-btn:hover{ background:#2e5985; }
+/* one chart per row, images scale to the page width */
+.plot-block{ display:flex; flex-direction:column; }
+.plot-item img{ max-width:100%; height:auto; }
+
+/* top-level tab bar */
+.tabbar{ position:sticky; top:0; z-index:20; background:#fff;
+  border-bottom:2px solid #3B6EA5; margin-bottom:14px; padding:6px 0; }
+.tabbtn{ background:#eef2f6; color:#33475b; border:1px solid #d0d7de;
+  border-bottom:none; padding:8px 16px; margin-right:4px; cursor:pointer;
+  border-radius:6px 6px 0 0; font-size:0.95em; }
+.tabbtn.active{ background:#3B6EA5; color:#fff; border-color:#3B6EA5; }
+
+/* Per-tab contents list, injected into the floating TOC sidebar. Styled to
+   match the tocify list that the report tab already shows there. */
+.pane-toc{ margin:0; padding:0; }
+.pane-toc li{ list-style:none; line-height:30px; text-indent:10px; }
+.pane-toc li.sub{ text-indent:24px; font-size:12px; }
+.pane-toc a{ display:block; color:inherit; text-decoration:none; }
+.pane-toc li.active{ background:#3B6EA5; border-color:#3B6EA5; }
+.pane-toc li.active a{ color:#fff; }
+
+/* involvement browser */
+.iv-controls{ position:sticky; top:46px; z-index:15; background:#f6f8fa;
+  border:1px solid #d0d7de; border-radius:6px; padding:12px 16px; margin-bottom:16px; }
+
+/* Split buttons come in three families. Each carries its family's colour as a
+   thick left edge, and turns fully that colour when active, so it is always
+   clear which kind of split is on screen without reading the labels. The
+   colours match the chart palettes in descriptives_browser.js. */
+.split-row{ display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+.fam-label{ font-size:0.72em; text-transform:uppercase; letter-spacing:0.06em;
+  font-weight:bold; margin-left:12px; margin-right:2px; }
+.fam-demo-txt{ color:#3B6EA5; }
+.fam-subst-txt{ color:#2E7D5B; }
+.fam-emo-txt{ color:#C51B7D; }
+.desc-split-btn{ border-left-width:4px !important; border-left-style:solid !important; }
+.fam-all{ border-left-color:#8a8a8a !important; }
+.fam-demo{ border-left-color:#3B6EA5 !important; }
+.fam-subst{ border-left-color:#2E7D5B !important; }
+.fam-emo{ border-left-color:#C51B7D !important; }
+.fam-all.active{ background:#8a8a8a !important; border-color:#8a8a8a !important; color:#fff !important; }
+.fam-demo.active{ background:#3B6EA5 !important; border-color:#3B6EA5 !important; color:#fff !important; }
+.fam-subst.active{ background:#2E7D5B !important; border-color:#2E7D5B !important; color:#fff !important; }
+.fam-emo.active{ background:#C51B7D !important; border-color:#C51B7D !important; color:#fff !important; }
+.iv-def-btn{ background:#eef2f6; border:1px solid #cfd6dd; color:#33475b;
+  padding:5px 10px; margin:2px; border-radius:4px; cursor:pointer; font-size:0.82em; }
+.iv-def-btn.active{ background:#3B6EA5; color:#fff; border-color:#3B6EA5; }
+.iv-sub-row{ margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.iv-sub-row input[type=range]{ flex:1; min-width:160px; }
+.iv-navbtn{ background:#3B6EA5; color:#fff; border:none; border-radius:4px;
+  padding:4px 10px; cursor:pointer; }
+.iv-readout{ font-weight:bold; color:#2e5985; min-width:230px; }
+.iv-legend{ font-size:0.78em; color:#555; margin-top:8px; }
+.iv-belief{ margin:6px 0 14px; border-bottom:1px solid #eee; padding-bottom:10px; }
+.iv-title{ font-weight:bold; font-size:0.95em; margin-bottom:2px; }
+.iv-sub{ color:#777; font-size:0.82em; margin-bottom:2px; }
+</style>
+```
+
+```{=html}
+<div class="tabbar">
+  <button class="tabbtn active" id="tabbtn-report"
+          onclick="showTab('report')">Descriptive report</button>
+  <button class="tabbtn" id="tabbtn-involvement"
+          onclick="showTab('involvement')">Involvement &times; bimodality</button>
+  <button class="tabbtn" id="tabbtn-analysis"
+          onclick="showTab('analysis')">Analyses</button>
+  <button class="tabbtn" id="tabbtn-time"
+          onclick="showTab('time')">Invultijd</button>
+</div>
+```
+
+```{=html}
+<div class="block-box" style="margin-top:0">
+<strong>This report describes the main study: the full main study, delivered 22 October 2026.</strong>
+The completed interviews are analysed, with the same charts, tables and splits
+as the pilot report. The full delivery also carries survey weights; nothing in
+this report is weighted.
+<br><br>
+<strong>What changed from the pilots.</strong> The main study has 18 belief
+statements in four blocks, three behaviour items, nine policy rules instead of
+seven, own use for four substance groups instead of nine substances, an emotion
+question about six topics without <em>hoop</em>, and five involvement sliders.
+The demographics are the agency's recodes; only age carries labels, because only
+age can be checked against the QSF.
+<br><br>
+<strong>Read the split buttons with the group sizes.</strong> Every descriptive
+chart can be broken down by the agency's demographics, by substance use and by
+support for regulating MDMA. Read every split with the group sizes beside it.
+</div>
+```
+
+```{=html}
+<div class="tabpane" id="pane-report">
+```
+
+```{r child = 'sections/descriptives.Rmd'}
+```
+
+```{=html}
+</div> <!-- end pane-report -->
+```
+
+```{=html}
+<div class="tabpane" id="pane-involvement" style="display:none">
+```
+
+```{r child = 'sections/involvement.Rmd'}
+```
+
+```{=html}
+</div> <!-- end pane-involvement -->
+```
+
+```{=html}
+<div class="tabpane" id="pane-analysis" style="display:none">
+```
+
+```{r child = 'sections/policy_profiles.Rmd'}
+```
+
+```{r child = 'sections/correlations.Rmd'}
+```
+
+```{r child = 'sections/pca.Rmd'}
+```
+
+```{r child = 'sections/survey_factors.Rmd'}
+```
+
+```{r child = 'sections/linearity.Rmd'}
+```
+
+```{r child = 'sections/network.Rmd'}
+```
+
+```{r child = 'sections/linear_models.Rmd'}
+```
+
+```{r child = 'sections/references_analysis.Rmd'}
+```
+
+```{=html}
+</div> <!-- end pane-analysis -->
+```
+
+```{=html}
+<div class="tabpane" id="pane-time" style="display:none">
+```
+
+```{r child = 'sections/time.Rmd'}
+```
+
+```{=html}
+</div> <!-- end pane-time -->
+```
+
+
+
+<script>
+/* ---- top-level tabs ---- */
+function showTab(name){
+  ['report','involvement','analysis','time'].forEach(function(t){
+    document.getElementById('pane-' + t).style.display =
+      (t === name) ? '' : 'none';
+    document.getElementById('tabbtn-' + t).classList.toggle('active', t === name);
+  });
+  if(window.showPaneToc) showPaneToc(name);
+}
+
+/* ---- a contents list in the sidebar for every tab ----
+   tocify builds ONE flat TOC for the whole document: its hierarchy runs
+   straight through the tab boundaries, so while the report tab was open the
+   sidebar listed the analysis and appendix sections too, and on the other tabs
+   those sections were nested under a report heading and unreachable.
+   Rather than fight tocify's tree, EVERY pane - the report included - gets its
+   own list built from its own headings, and tocify's own lists stay hidden.
+   Each tab then shows exactly its own sections and nothing else.
+
+   Headings only appear here if they carry an id. Pandoc gives one to every
+   markdown heading; the raw-HTML <h1>/<h2> that open each pane have theirs
+   written out by hand for that reason. */
+(function(){
+  var toc = document.getElementById('TOC');
+  if(!toc) return;
+
+  function build(pane){
+    var heads = pane.querySelectorAll('h1:not(.toc-ignore), h2:not(.toc-ignore)');
+    var ul = document.createElement('ul');
+    ul.className = 'pane-toc list-group';
+    ul.style.display = 'none';
+    heads.forEach(function(h){
+      if(!h.id) return;
+      var a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = h.textContent.replace(/\s+/g, ' ').trim();
+      var li = document.createElement('li');
+      li.className = 'list-group-item' + (h.tagName === 'H2' ? ' sub' : '');
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+    if(!ul.children.length) return null;   // a pane without headings: no list
+    toc.appendChild(ul);
+    return ul;
+  }
+
+  var lists = {};
+  ['report','involvement','analysis','time'].forEach(function(t){
+    lists[t] = build(document.getElementById('pane-' + t));
+  });
+
+  var current = null;
+  window.showPaneToc = function(name){
+    // tocify emits one top-level <ul> PER h1, not a single tree, and none of
+    // them is wanted now that every pane has its own list. They are hidden
+    // HERE rather than once at setup: this script runs while the document is
+    // still parsing, and tocify does not build those <ul>s until jQuery's
+    // ready event, so anything hidden at setup would simply reappear.
+    toc.querySelectorAll(':scope > ul:not(.pane-toc)').forEach(function(u){
+      u.style.display = 'none';
+    });
+    Object.keys(lists).forEach(function(t){
+      if(lists[t]) lists[t].style.display = (t === name) ? '' : 'none';
+    });
+    current = lists[name] || null;
+    // a pane with no headings at all gets no sidebar
+    toc.style.display = current ? '' : 'none';
+    mark();
+  };
+
+  // the report tab is the one open on load; wait for tocify to have built its
+  // lists before hiding them
+  window.addEventListener('load', function(){ showPaneToc('report'); });
+
+  // highlight the section currently at the top of the screen, the way tocify
+  // does on the report tab
+  function mark(){
+    if(!current) return;
+    var items = current.querySelectorAll('li'), best = -1;
+    items.forEach(function(li, i){
+      var h = document.getElementById(li.querySelector('a').getAttribute('href').slice(1));
+      if(h && h.getBoundingClientRect().top <= 120) best = i;
+    });
+    items.forEach(function(li, i){ li.classList.toggle('active', i === best); });
+  }
+  window.addEventListener('scroll', mark);
+})();
+
+/* ---- involvement bimodality browser ----
+   Moved to involvement_browser.js and inlined by
+   sections/involvement.Rmd, which is where its data comes from. */
+
+</script>
+```
+
+```{r dataset-checks, echo=TRUE}
+# Invariants of the analysis dataset. These are cheap and they fail the knit
+# loudly, which is what you want if new data or a reworded question ever
+# breaks an assumption the rest of the report is built on.
+stopifnot(
+  # one row per analysed respondent, no duplicates
+  nrow(pilot) == n_pilot,
+  !anyDuplicated(pilot$ResponseId),
+  # every item block is present and complete
+  all(item_meta$variable %in% names(pilot)),
+  all(paste0(item_meta$variable, "_scored") %in% names(pilot)),
+  all(POLICY_COLUMNS %in% names(pilot)),
+  length(select_items("betrokkenheid",   names(pilot))) == 5L,
+  length(subst_cols) == 4L,
+  # reverse-scoring is its own inverse on the flipped items, and a no-op elsewhere
+  all.equal(pilot[[reverse_cols[1]]],
+            (SCALE_MIN + SCALE_MAX) - pilot[[paste0(reverse_cols[1], "_scored")]]),
+    # an item the pool calls "Pro" is not flipped: its _scored copy is the raw
+  # answer. Taken from item_meta rather than named, because the two pilots do
+  # not share item names.
+  identical(pilot[[item_meta$variable[item_meta$reverse_coded == "no"][1]]],
+            pilot[[paste0(item_meta$variable[item_meta$reverse_coded == "no"][1],
+                          "_scored")]])
+)
+cat("`pilot`:", nrow(pilot), "respondents x", ncol(pilot),
+    "columns - all checks passed.\n")
+```
+
+# Reproducibility
+
+```{r session-info, echo=TRUE}
+sessioninfo::session_info()
+```

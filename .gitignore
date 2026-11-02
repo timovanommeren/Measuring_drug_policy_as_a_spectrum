@@ -10,6 +10,11 @@ analysis/**/*.csv
 # exploratory output (regenerate with the scripts in analysis/R/exploratory/)
 analysis/output/
 
+# rendered reports and knitr caches (render locally)
+analysis/reports/**/*.html
+analysis/reports/**/*_cache/
+analysis/reports/**/*_files/
+
 # R / RStudio
 .Rproj.user/
 .Rhistory

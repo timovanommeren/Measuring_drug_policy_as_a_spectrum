@@ -1,0 +1,479 @@
+# =============================================================================
+# involvement.R
+# -----------------------------------------------------------------------------
+# The involvement x bimodality analysis: does a more involved respondent hold
+# a less nuanced, more polarised view? Bimodality is the operationalisation -
+# two peaks at the ends of a belief scale rather than one central hump.
+#
+# Follows Hoffstadt et al. (2025) step for step, using their published code
+# where it exists:
+#   1 split      split_involvement()      [Hoffstadt et al., below]
+#   2 modality   remode::remode()         [ReMoDe package]
+#   3 classify   polarization_class()     [their Fig. 3 criteria]
+#   4 dispersion mid_prop(), median_AD()  [authors' code]
+#   5-6 compare  their Table 3 indicators
+#
+# The stability check jackknifes every distribution and is slow, so it is
+# cached in IV_STAB_CACHE. Delete that file to recompute.
+#
+# Produces `iv_data`, serialised to JSON by sections/involvement.Rmd and drawn
+# in the browser. Needs `pilot` and `wording` from R/data.R, and the remode
+# package.
+# =============================================================================
+
+## ---- EDITABLE DECISIONS for the involvement analysis ------------------------
+IV_BIN_METHOD <- "authors"   # "authors"     = split_involvement() from the
+                             #                 authors' repository -> 4 quartiles
+                             # "quantile"    = equal-sized quintiles (5 groups)
+                             # "equal_width" = fixed 0-20 / 20-40 / ... bins
+IV_MIN_N      <- 20          # a subgroup must have at least this many
+                             #   respondents to enter the ranking
+IV_N_BOOT     <- 2000        # bootstrap resamples for remode() (package default
+                             #   is 10000; 2000 keeps knitting fast)
+## Stability check (remode::remode_stability). It jackknifes each distribution,
+## so it is slow; results are cached in IV_STAB_CACHE and only the two subgroups
+## that drive the ranking are checked. Delete the cache file to recompute.
+IV_STABILITY  <- TRUE
+IV_STABLE_MIN <- 40          # a classification counts as stable if it survives
+                             #   at least this % of the data being removed
+IV_STAB_ITER  <- 100         # jackknife resamples per removal step
+IV_STAB_STEPS <- 10          # removal steps (10 -> 0,10,20,...,100 %)
+IV_STAB_TEST  <- "binomial"  # significance test used INSIDE the jackknife.
+                             #   "binomial"  ~1 min for the whole grid
+                             #   "bootstrap" more exact at small N, ~23 min
+                             #   (the displayed mode counts always use bootstrap)
+IV_STAB_CACHE <- here("analysis", "reports", "descriptive_plots", "cache", "remode_stability_cache.rds")
+## -----------------------------------------------------------------------------
+
+# Build the full data cube (belief x involvement-definition x subgroup).
+#   step 1 (split)      -> split_involvement()  [authors' code]
+#   step 2 (modality)   -> remode::remode()     [ReMoDe package]
+#   step 3 (classify)   -> polarization_class() [their Fig. 3 criteria]
+#   step 4 (dispersion) -> mid_prop(), median_AD() [authors' code]
+#   steps 5-6 (compare) -> their Table 3 indicators
+# The charts are drawn client-side from this JSON.
+
+# Splits a 0-100 involvement score into ordered subgroups. method = "authors"
+# calls split_involvement() from the authors' repository (-> 4 quartiles);
+# their code does not tolerate NA, so it is fed the complete cases only and
+# the quartiles are mapped back onto the original rows. "equal_width" cuts at
+# fixed 0-20/20-40/... points; "quantile" cuts at the empirical quantiles of
+# the observed scores. Equal-sized groups (authors/quantile) matter because
+# ReMoDe only declares a mode when a peak is SIGNIFICANTLY higher than its
+# neighbours, so a small subgroup returns few modes for lack of power rather
+# than because it is flat.
+involvement_bins <- function(x, method = c("authors", "quantile", "equal_width"),
+                             n_bins = 5) {
+  method <- match.arg(method)
+  if (method == "authors") {
+    out <- rep(NA_integer_, length(x))
+    ok  <- !is.na(x)
+    if (any(ok)) out[ok] <- as.integer(split_involvement(x[ok]))
+    return(out)
+  }
+  if (method == "equal_width") {
+    b <- floor(x / (100 / n_bins)) + 1
+    b[is.na(x) | x < 0] <- NA
+    b[!is.na(b) & b > n_bins] <- n_bins      # a score of exactly 100 -> last bin
+    return(as.integer(b))
+  }
+  qs <- stats::quantile(x, probs = seq(0, 1, length.out = n_bins + 1), na.rm = TRUE)
+  qs[1] <- -Inf; qs[length(qs)] <- Inf
+  qs <- unique(qs)                            # guard against tied quantiles
+  as.integer(cut(x, breaks = qs, include.lowest = TRUE, labels = FALSE))
+}
+
+# Wrapper around remode::remode_stability(), which jackknifes a distribution:
+# at each step it deletes a growing share of the data, re-runs remode() many
+# times, and reports the largest share that can be removed while the
+# majority of resamples still recover the original number of modes
+# ("stable_until", in %). Slow (seconds per distribution), so results are
+# memoised in `cache` and written to disk between knits by the caller.
+# NOTE: the package's `location_stability` element comes back empty because
+# remode_stability() reads `remode_result$modes` while remode() returns
+# `mode_indeces`; only `stable_until` is used here.
+stability_of <- function(counts, cache, alpha = 0.05, n_boot = 2000,
+                         iterations = 100, percentage_steps = 10,
+                         test = c("binomial", "bootstrap")) {
+  test <- match.arg(test)
+  if (sum(counts) == 0) return(NA_real_)
+  key <- paste0(paste(counts, collapse = ","), "|", alpha, "|", n_boot, "|",
+                iterations, "|", percentage_steps, "|", test)
+  if (!is.null(cache[[key]])) return(cache[[key]])
+
+  # The displayed mode count always comes from the bootstrap test, which the
+  # ReMoDe paper recommends at small N. For the *resampling* the binomial test
+  # is substituted: ~130x faster (whole grid in ~1 min instead of ~23 min) and
+  # on this data the more conservative of the two, i.e. it errs towards
+  # flagging a classification as unstable.
+  fit <- remode::remode(counts, alpha = alpha, n_boot = n_boot)
+  out <- if (fit$nr_of_modes == 0) NA_real_ else {
+    fit_for_stab <- fit
+    fit_for_stab$sign_test <- test        # reference count stays the bootstrap one
+    s <- try(remode::remode_stability(fit_for_stab, iterations = iterations,
+                                      percentage_steps = percentage_steps,
+                                      plot = FALSE), silent = TRUE)
+    if (inherits(s, "try-error")) NA_real_ else as.numeric(s$stable_until)
+  }
+  cache[[key]] <- out
+  out
+}
+
+# ---- Helper functions of Hoffstadt et al. --------------------------------------
+# Copied verbatim from github.com/mfhstdt/involvement_polarization
+# (helper_functions/), MIT License, Copyright (c) 2024 mfhstdt.
+
+##### function to split sample into 4 quartiles based on involvement scores #####
+split_involvement <- function(x){
+  group <- c()
+
+  # compute cut-offs
+  quartiles <-  quantile(x, probs = c(0.25, 0.5, 0.75))
+  group <- ifelse(x < quartiles[1], 1,
+                                 ifelse(x < quartiles[2], 2,
+                                        ifelse(x < quartiles[3], 3,
+                                               4)))
+
+  # return vector indicating which quartile observations belong to
+  return(group)
+}
+
+######## Compute median absolute deviation  from the middle category  ##########
+median_AD <- function(x, mid = NULL){ # input is categorical
+  tab <- table(x)
+
+  # specify midpoint
+  if(!is.null(mid)){
+    midpoint <- mid
+  } else if(length(tab) %% 2 != 0){ # num. of categories uneven
+    midpoint <- as.numeric(names(tab[round((length(tab)/2))]))
+  } else{ # num. of categories even
+    midpoint <- (as.numeric(names(tab[round((length(tab)/2))])) +
+                   (as.numeric(names(tab[round((length(tab)/2))]))+1)) / 2
+  }
+
+  # compute absolute deviation from midpoint for each observation
+  abs_dev <- c()
+  for(obs in seq_along(x)){
+    abs_dev[obs] <- abs(x[obs] - midpoint)
+  }
+
+  median_abs_dev <- median(abs_dev)
+
+  return(list("middle category" = midpoint,
+              "median absolute deviation from midpoint" = median_abs_dev))
+}
+
+#### Function to compute proportion of respondents choosing middle category ###
+mid_prop <- function(x, mid = NULL){ # input is categorical data, optionally specify middle category
+  tab <- table(x)
+
+  if(!is.null(mid)){ # when middle category specified
+    midpoint = mid
+    prop <- (tab[midpoint] / length(x))
+
+  } else if((length(tab) %% 2 != 0)){ # if num of categories uneven
+    midpoint <- names(tab[round((length(tab)/2))])
+    prop <- (tab[midpoint] / length(x))
+
+  } else { # if uneven take two middle categories
+    midpoint <- c(names(tab[length(tab)/2]),
+                  names(tab[(length(tab)/2)+1]))
+    prop <- (sum(tab[midpoint]) / length(x))
+  }
+
+  return(prop)
+}
+
+
+# Classification criteria of Hoffstadt et al. (2025, Figure 3): 0 = not
+# polarised (unimodal); 1 = weakly polarised (multimodal, but a mode still
+# sits at the middle category); 2 = strongly polarised (multimodal, no mode
+# at the middle category).
+polarization_class <- function(n_modes, mode_positions, middle_index) {
+  if (is.na(n_modes) || n_modes < 2) return(0L)
+  if (middle_index %in% mode_positions) return(1L)
+  2L
+}
+
+# Compact axis labels for an ordered k-point scale, so a Likert distribution
+# reads at a glance (two humps = bimodal). Full labels are shown in a legend.
+short_scale_codes <- function(k) {
+  if (k == 7) return(c("−−−", "−−", "−", "0",
+                       "+", "++", "+++"))
+  if (k == 5) return(c("−−", "−", "0", "+", "++"))
+  as.character(seq_len(k))
+}
+
+# Modality is estimated with the official ReMoDe package (remode::remode);
+# `set.seed` once so its bootstrap p-values are reproducible.
+stopifnot(requireNamespace("remode", quietly = TRUE))
+set.seed(1)
+
+# memoisation store for the (slow) stability checks, persisted between knits
+stab_cache <- new.env(parent = emptyenv())
+if (IV_STABILITY && file.exists(IV_STAB_CACHE)) {
+  old <- readRDS(IV_STAB_CACHE)
+  for (nm in names(old)) assign(nm, old[[nm]], envir = stab_cache)
+}
+
+# -----------------------------------------------------------------------------
+# build_involvement_data()
+# -----------------------------------------------------------------------------
+# The analysis itself, over whatever items and involvement measures it is
+# given. The caller at the end of this file hands it `pilot`'s items.
+#
+# Arguments
+#   items        respondent x item matrix of ordinal codes
+#   inv          named list of involvement scores, one vector per definition
+#   def_labels   named list, one readable label per definition
+#   valid_codes  the ordinal codes an answer may take
+#   scale_labels the full answer labels for those codes
+#   titles       named character vector, item -> chart title
+#   item_scales  optional named list, item -> its own answer labels, for items
+#                measured on a different scale with the same number of points
+#                (the pilots' binned policy sliders)
+#   stability    run the jackknife stability check. FALSE for large samples,
+#                where remode_stability() costs ~1 000 ReMoDe calls per
+#                subgroup and modality estimates are not fragile anyway.
+build_involvement_data <- function(items, inv, def_labels, valid_codes,
+                                   scale_labels, titles, item_scales = NULL,
+                                   stability = IV_STABILITY,
+                                   bin_method = IV_BIN_METHOD,
+                                   min_n = IV_MIN_N, n_boot = IV_N_BOOT,
+                                   cache_file = IV_STAB_CACHE) {
+  belief_cols <- colnames(items)
+  def_names   <- names(inv)
+  k           <- length(valid_codes)
+  iv_items    <- items
+
+  # 1..n_bins per respondent, per involvement definition. With bin_method =
+  # "authors" this calls split_involvement() and therefore yields 4 quartiles,
+  # so n_bins is taken from the result rather than assumed.
+  n_bins  <- 5
+  bins_of <- lapply(inv, involvement_bins, method = bin_method, n_bins = n_bins)
+  if (identical(bin_method, "authors")) n_bins <- 4L
+
+  middle_index <- (k + 1) / 2          # central category (4 on a 1-7 scale)
+  midpoint_val <- (min(valid_codes) + max(valid_codes)) / 2
+
+  beliefs <- list()
+  for (bcol in belief_cols) {
+    belief_values <- iv_items[, bcol]
+
+    states    <- list()
+    crit      <- list()
+    max_props <- numeric(0)
+    for (dn in def_names) {
+      grp <- bins_of[[dn]]
+      per_subgroup <- vector("list", n_bins)
+      for (g in seq_len(n_bins)) {
+        keep  <- which(grp == g & !is.na(belief_values) &
+                       belief_values %in% valid_codes)
+        codes <- belief_values[keep]
+        n     <- length(codes)
+        counts <- tabulate(match(codes, valid_codes), nbins = k)
+        prop   <- if (n > 0) round(100 * counts / n, 1) else rep(0, k)
+
+        # ---- modality via the official ReMoDe package ----
+        if (n > 0) {
+          rm_fit  <- remode::remode(counts, alpha = 0.05, n_boot = n_boot)
+          n_modes <- rm_fit$nr_of_modes
+          m_pos   <- sort(as.integer(rm_fit$mode_indeces))
+        } else { n_modes <- 0L; m_pos <- integer(0) }
+
+        per_subgroup[[g]] <- list(
+          n     = n,
+          sd    = if (n >= 2) round(sd(codes), 2) else NA_real_,
+          modes = n_modes,
+          modePos = m_pos,
+          # Hoffstadt et al. (2025) polarisation class from modality + whether
+          # a mode sits at the neutral middle category
+          pol   = polarization_class(n_modes, m_pos, middle_index),
+          midAt = as.integer(middle_index %in% m_pos),
+          # supporting dispersion measures, computed with the AUTHORS' OWN
+          # functions (mid_prop / median_AD from their repository).
+          # mid_prop() looks the middle category up by NAME in table(x), so we
+          # hand it a factor with every scale point present - otherwise a
+          # subgroup in which nobody used a category would shift the lookup.
+          # median_AD() gets `mid` explicitly for the same reason.
+          pctMid = if (n > 0) {
+            p <- mid_prop(factor(codes, levels = valid_codes),
+                          mid = as.character(midpoint_val))
+            round(100 * ifelse(is.na(p), 0, as.numeric(p)), 1)
+          } else NA_real_,
+          madMid = if (n > 0) {
+            round(median_AD(codes, mid = midpoint_val)[[2]], 2)
+          } else NA_real_,
+          prop  = prop
+        )
+        if (n >= 10) max_props <- c(max_props, max(prop))
+      }
+      states[[dn]] <- per_subgroup
+
+      # ---- ranking score: how many of the six HIOM indicators of
+      # "involvement polarises this item" are satisfied, comparing the lowest
+      # with the highest subgroup that has enough respondents to be informative
+      # (Hoffstadt et al., 2025, Table 3).
+      elig <- which(vapply(per_subgroup, function(s) s$n >= min_n, logical(1)))
+      if (length(elig) >= 2) {
+        lo <- per_subgroup[[min(elig)]]; hi <- per_subgroup[[max(elig)]]
+        checks <- c(
+          multimodal_high = hi$modes >= 2,
+          unimodal_low    = lo$modes <  2,
+          sd_higher_high  = isTRUE(hi$sd     >  lo$sd),
+          pctmid_lower_hi = isTRUE(hi$pctMid <  lo$pctMid),
+          madmid_high     = isTRUE(hi$madMid >  lo$madMid),
+          no_mid_mode_hi  = hi$midAt == 0
+        )
+        # Stability of the two classifications the ranking rests on. Only these
+        # two subgroups are checked, because remode_stability() is expensive and
+        # they are the ones that decide the polarisation change.
+        sLo <- sNa <- NA_real_; sHi <- NA_real_
+        if (stability) {
+          iLo <- min(elig); iHi <- max(elig)
+          cLo <- tabulate(match(
+            belief_values[which(grp == iLo & !is.na(belief_values) &
+                                belief_values %in% valid_codes)], valid_codes), nbins = k)
+          cHi <- tabulate(match(
+            belief_values[which(grp == iHi & !is.na(belief_values) &
+                                belief_values %in% valid_codes)], valid_codes), nbins = k)
+          sLo <- stability_of(cLo, stab_cache, n_boot = n_boot,
+                              iterations = IV_STAB_ITER, percentage_steps = IV_STAB_STEPS,
+                              test = IV_STAB_TEST)
+          sHi <- stability_of(cHi, stab_cache, n_boot = n_boot,
+                              iterations = IV_STAB_ITER, percentage_steps = IV_STAB_STEPS,
+                              test = IV_STAB_TEST)
+          per_subgroup[[iLo]]$stableUntil <- sLo
+          per_subgroup[[iHi]]$stableUntil <- sHi
+          states[[dn]] <- per_subgroup      # refresh with the stability values
+        }
+        # the comparison is flagged as unstable when either end fails to survive
+        # `stable_min` percent of the data being removed
+        unstable <- as.integer(isTRUE(sLo < IV_STABLE_MIN) || isTRUE(sHi < IV_STABLE_MIN) ||
+                               is.na(sLo) || is.na(sHi))
+
+        crit[[dn]] <- list(score = sum(checks), checks = as.integer(checks),
+                           polLow = lo$pol, polHigh = hi$pol,
+                           loGrp = min(elig), hiGrp = max(elig),
+                           stabLow = sLo, stabHigh = sHi, unstable = unstable)
+      } else {
+        crit[[dn]] <- list(score = NA_integer_, checks = rep(NA_integer_, 6),
+                           polLow = NA_integer_, polHigh = NA_integer_,
+                           loGrp = NA_integer_, hiGrp = NA_integer_,
+                           stabLow = NA_real_, stabHigh = NA_real_,
+                           unstable = NA_integer_)
+      }
+    }
+
+    # shared, stable y-axis (%) for this item's small multiples
+    y_limit <- if (length(max_props))
+      min(100, max(30, ceiling(max(max_props) / 10) * 10)) else 100
+
+    is_slider <- startsWith(bcol, "__bin_")
+    src_col   <- sub("^__bin_", "", bcol)
+    entry <- list(
+      title  = paste0(length(beliefs) + 1, ". ",
+                      if (is_slider) paste0("[beleid] ", titles[[src_col]])
+                      else titles[[bcol]]),
+      yLimit = y_limit,
+      # slider items are on the policy scale, not the agreement scale
+      scaleLabels = if (!is.null(item_scales)) item_scales[[bcol]] else NULL,
+      scaleShort  = if (!is.null(item_scales) && !is.null(item_scales[[bcol]]))
+        as.character(seq_len(k)) else NULL,
+      states = states,
+      crit   = crit
+    )
+    # jsonlite turns a NULL list element into an empty object {}, which is
+    # truthy in JavaScript, so drop the unused fields entirely.
+    beliefs[[length(beliefs) + 1]] <- entry[!vapply(entry, is.null, logical(1))]
+  }
+
+  # labels describing each subgroup, which depend on how the bins were formed
+  bin_labels <- if (identical(bin_method, "equal_width")) {
+    edges <- seq(0, 100, length.out = n_bins + 1)
+    paste0(round(edges[-length(edges)]), "–", round(edges[-1]))
+  } else if (identical(bin_method, "authors")) {
+    paste0("quartile ", seq_len(n_bins))
+  } else {
+    paste0("Q", seq_len(n_bins))
+  }
+  # observed involvement range per quantile bin, per definition (for the readout)
+  bin_ranges <- lapply(def_names, function(dn) {
+    vapply(seq_len(n_bins), function(g) {
+      v <- inv[[dn]][which(bins_of[[dn]] == g)]
+      if (!length(v)) "" else paste0(round(min(v, na.rm = TRUE)), "–",
+                                     round(max(v, na.rm = TRUE)))
+    }, character(1))
+  })
+  names(bin_ranges) <- def_names
+
+  # write the memoised stability results back to disk so later knits are instant
+  if (stability && length(ls(stab_cache))) {
+    saveRDS(as.list(stab_cache), cache_file)
+  }
+
+  iv_data <- list(
+    scaleLabels = scale_labels,
+    scaleShort  = short_scale_codes(k),
+    middleIndex = middle_index,      # central category, used to colour its mode
+    stability   = stability,
+    stableMin   = IV_STABLE_MIN,
+    stabSteps   = IV_STAB_STEPS,
+    stabTest    = IV_STAB_TEST,
+    binLabels   = bin_labels,
+    binRanges   = bin_ranges,
+    binMethod   = bin_method,
+    minNRank    = min_n,
+    critNames   = c("multimodal at high", "unimodal at low", "SD higher at high",
+                    "% middle lower at high", "dispersion higher at high",
+                    "no middle mode at high"),
+    polNames    = c("not polarised", "weakly polarised", "strongly polarised"),
+    defs        = def_names,
+    defLabels   = def_labels,
+    beliefs     = beliefs
+  )
+}
+
+
+# -----------------------------------------------------------------------------
+# The caller: the 18 belief items, then the nine policy rules
+# -----------------------------------------------------------------------------
+# build_involvement_data() takes one scale length per call, so the rules (nine
+# options, middle category rule 5) get a call of their own and are appended
+# with their own scale labels.
+belief_cols <- select_items("beliefs", names(pilot))
+scale       <- question_scale(belief_cols)
+
+inv_cols <- select_items("betrokkenheid", names(pilot))
+inv <- c(as.list(pilot[inv_cols]), list(combined = pilot$betrokkenheid_mean))
+def_labels <- c(setNames(lapply(inv_cols, function(col) item_title(wording[[col]])), inv_cols),
+                list(combined = "Alle vijf samen (gemiddelde)"))
+
+iv_data <- build_involvement_data(
+  items        = as.matrix(pilot[belief_cols]),
+  inv          = inv,
+  def_labels   = def_labels,
+  valid_codes  = as.numeric(scale$code),
+  scale_labels = scale$label,
+  titles       = setNames(lapply(belief_cols, function(col) item_title(wording[[col]])), belief_cols))
+
+# the rules as 1-9, from their position on the 0-100 slider
+policy_items <- vapply(slider_cols, function(cl) 1 + pilot[[cl]] / diff(policy_anchors$pos)[1],
+                       numeric(nrow(pilot)))
+colnames(policy_items) <- paste0("__bin_", slider_cols)
+iv_policy <- build_involvement_data(
+  items        = policy_items,
+  inv          = inv,
+  def_labels   = def_labels,
+  valid_codes  = seq_len(nrow(policy_anchors)),
+  scale_labels = policy_anchors$label,
+  titles       = setNames(lapply(slider_cols, function(cl) item_title(wording[[cl]])), slider_cols),
+  item_scales  = setNames(rep(list(policy_anchors$label), length(slider_cols)), colnames(policy_items)))
+n_beliefs <- length(iv_data$beliefs)
+iv_data$beliefs <- c(iv_data$beliefs, lapply(seq_along(iv_policy$beliefs), function(i) {
+  entry <- iv_policy$beliefs[[i]]
+  entry$title <- sub("^[0-9]+\\. ", paste0(n_beliefs + i, ". "), entry$title)
+  entry$middleIndex <- (nrow(policy_anchors) + 1) / 2
+  entry
+}))

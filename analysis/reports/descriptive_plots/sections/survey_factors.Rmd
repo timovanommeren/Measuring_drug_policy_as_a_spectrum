@@ -1,0 +1,133 @@
+```{r setup-survey-factors, include=FALSE}
+library(here)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 7, dpi = 110)
+source(here("analysis", "reports", "descriptive_plots", "R", "PCA.R"))                  # BLOCKS, METHOD, ROTATION, LOAD_MIN, ...
+source(here("analysis", "reports", "descriptive_plots", "R", "survey_factors.R"))  # survey_factor_solution()
+```
+
+```{=html}
+<hr>
+<h1 id="survey-factors">Structure of the whole survey</h1>
+
+<div class="block-box">
+<strong>A different question from the block PCAs above.</strong> Those ask, five
+times over, whether one block of items has a structure. This asks what
+dimensions run through <em>every</em> item the survey asks - and a dimension
+that cuts across blocks is one the per-block analysis cannot see by
+construction.
+<br><br>
+<strong>Two steps.</strong> First <em>how many</em> dimensions: parallel
+analysis, the same rule and iteration count the block PCAs use, so both are
+decided the same way. Then <em>what they are</em>: an exploratory factor
+analysis with that many factors. The two methods answer different questions -
+components summarise the items, factors model what the items have in common -
+and the second is the one "which items belong together" asks for.
+<br><br>
+<strong>The items are not on one scale</strong> (Likert 1-7, sliders 0-100,
+substance use 0-2), so everything here is computed from a Spearman
+<em>correlation</em> matrix, which is scale-free. Rotation is oblique: the
+dimensions of an attitude survey are expected to correlate, and forcing them
+apart would hide exactly that.
+</div>
+```
+
+```{r survey-factors-fit, cache=TRUE}
+# One solution over every item in every block. `block_of` is only carried
+# through so the loadings table can say which block an item came from.
+block_of <- setNames(rep(names(BLOCKS), lengths(BLOCKS)), unlist(unname(BLOCKS)))
+solution <- survey_factor_solution(pilot, block_of = block_of)
+```
+
+```{r survey-factors-summary, results='asis'}
+cat(sprintf(paste("Parallel analysis retains **%d** dimensions over **%d**",
+                  "items and %d complete respondents. The %d factors account",
+                  "for **%.1f%%** of the variance between them (%s%% each).\n\n"),
+            solution$k_parallel, length(solution$columns), solution$n_obs,
+            solution$k, solution$cumulative,
+            paste(solution$var_pc, collapse = " / ")))
+if (length(solution$dropped))
+  cat(sprintf(paste("`%s` is left out: every respondent gave the same answer,",
+                    "so it has no correlation with anything.\n\n"),
+              paste(solution$dropped, collapse = "`, `")))
+```
+
+:::: {.block-box}
+**How much weight this carries.** `r solution$n_obs` respondents over
+`r length(solution$columns)` items is about
+`r round(solution$n_obs / length(solution$columns), 1)` per item. A factor
+solution wants several times that before its details are stable, so what is
+worth reading here is the broad grouping — which families of items travel
+together — and not the exact loading of any single item.
+::::
+
+## Factor correlations
+
+```{r survey-factors-phi}
+# Oblique rotation, so the factors may correlate. If these were near zero, an
+# orthogonal rotation would have been the simpler choice; they are not.
+if (!is.null(solution$phi)) {
+  knitr::kable(solution$phi,
+               caption = paste("Correlations between the factors.",
+                               "Oblique rotation allows these to be non-zero."))
+}
+```
+
+## Which items load where
+
+```{r survey-factors-table}
+# Sorted by factor, then by loading, so each factor reads as a block. An item
+# whose strongest loading is below the threshold gets "-": it is not assigned
+# anywhere rather than being forced onto its best guess.
+tbl <- solution$table[order(solution$table$factor,
+                            -abs(solution$table$loading)), ]
+knitr::kable(tbl, row.names = FALSE,
+             caption = paste0("Primary loading per item (|loading| >= ",
+                              LOAD_MIN, " to be assigned). h2 is the share of",
+                              " the item's variance the factors account for."))
+```
+
+```{r survey-factors-heatmap, fig.width=9, fig.height=11}
+# The full loading matrix. Wrapped item wording on the rows - not truncated:
+# several items share an opening clause, so a cut-off label cannot be told
+# apart from its neighbour.
+loads <- solution$loadings
+labels <- vapply(solution$columns, function(column)
+  if (is.na(wording[column])) column else item_title(wording[[column]]),
+  character(1))
+row_labels <- paste0(seq_along(labels), ". ", labels)
+
+tiles <- expand.grid(variable = solution$columns,
+                     factor = colnames(loads), stringsAsFactors = FALSE)
+tiles$loading <- as.vector(loads)
+tiles$flag    <- abs(tiles$loading) >= LOAD_MIN
+tiles$row_lab <- factor(row_labels[match(tiles$variable, solution$columns)],
+                        levels = row_labels)
+
+ggplot(tiles, aes(x = factor, y = row_lab, fill = loading)) +
+  geom_tile(colour = "white") +
+  geom_tile(data = tiles[tiles$flag, ], colour = "black", fill = NA) +
+  geom_text(aes(label = sub("^0", "", sprintf("%.2f", loading))),
+            size = 2.2, colour = "grey15") +
+  scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#B2182B",
+                       midpoint = 0, limits = c(-1, 1), name = "loading") +
+  scale_y_discrete(limits = rev(row_labels),
+                   labels = scales::label_wrap(TEXT_CAP)) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.y = element_text(size = 7, hjust = 1, lineheight = 0.9),
+        panel.grid = element_blank())
+```
+
+## Where the factors sit relative to the survey's own blocks
+
+```{r survey-factors-blocks}
+# Whether the empirical dimensions follow the blocks the survey was written in,
+# or cut across them. A factor drawing items from several blocks is the case
+# the per-block analysis above cannot detect.
+knitr::kable(
+  as.data.frame.matrix(table(factor = solution$table$factor,
+                             blok   = solution$table$block)),
+  caption = paste("Items per factor by survey block.",
+                  "'-' is an item with no loading above the threshold."))
+```

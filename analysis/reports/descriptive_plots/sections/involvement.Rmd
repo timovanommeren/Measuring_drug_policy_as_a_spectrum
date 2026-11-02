@@ -1,0 +1,183 @@
+```{r setup-involvement, include=FALSE}
+library(here)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 7, dpi = 110)
+library(remode)          # Hoffstadt et al. (2026)
+```
+
+```{=html}
+<h1 id="involvement-bimodality">Involvement &times; bimodality (exploratory)</h1>
+<div class="block-box">
+Does involvement change the <em>shape</em> of the belief distributions? The
+theoretical prediction is that more involved respondents hold less nuanced,
+more polarised views &mdash; so <strong>bimodality should increase</strong>
+with involvement (two peaks at the ends rather than a single central hump).
+<br><br>
+Each belief item below is split into <strong>5 involvement subgroups</strong>
+(0&ndash;20, 20&ndash;40, &hellip;, 80&ndash;100). Pick how involvement is
+defined &mdash; each of the five involvement questions on its own, or the five
+combined (their mean) &mdash; then <strong>drag the slider from low to high
+involvement</strong> and watch each distribution morph. Bars are the
+<strong>percentage of that subgroup</strong> (so unequal group sizes stay
+comparable); the per-item y-axis is fixed across subgroups so the shape change
+is what you see. Small subgroups (low n, shown per item) are noisy &mdash; read
+them with care.
+<br><br>
+Each chart's subtitle reports the <strong>number of modes</strong> estimated by
+the <strong>ReMoDe package</strong> (Hoffstadt et&nbsp;al., 2026): a category
+counts as a mode when its frequency is <em>significantly</em> higher (bootstrap
+test) than the lowest frequency to its left and to its right, applied
+recursively.
+<br><br>
+<strong>How the items are ranked.</strong> There is no standard
+&ldquo;modality-increase index&rdquo; in the literature, so the ranking follows
+the approach of <strong>Hoffstadt et&nbsp;al. (2025)</strong> &mdash; the same
+group as the ReMoDe authors, studying this exact question (involvement as a
+polarising factor). Each subgroup's distribution is first <em>classified</em>
+from its modality <em>and</em> from whether a mode sits at the neutral middle
+category:
+<ul style="margin:6px 0">
+<li><strong>not polarised</strong> &ndash; unimodal;</li>
+<li><strong>weakly polarised</strong> &ndash; multimodal, but a mode still sits
+    at the middle category (a moderate common ground survives);</li>
+<li><strong>strongly polarised</strong> &ndash; multimodal with no mode at the
+    middle (the sample splits into opposing camps).</li>
+</ul>
+Items are then ordered by the <strong>change in this class</strong> from the
+lowest to the highest involvement subgroup. Ties are broken by how many of the
+paper's six supporting indicators hold (multimodal at high involvement, unimodal
+at low, higher SD at high, smaller share choosing the middle category, larger
+median absolute deviation from the scale midpoint, and no mode at the middle).
+Both are shown under every chart.
+<br><br>
+<strong>Steps 1&ndash;6 run the authors' own code</strong>, sourced from a local
+clone of their replication repository
+(<code>github.com/mfhstdt/involvement_polarization</code>):
+<code>split_involvement()</code> forms the subgroups,
+<code>mid_prop()</code> the share choosing the middle category and
+<code>median_AD()</code> the median absolute deviation from the midpoint.
+Their <code>split_involvement()</code> produces <strong>4 quartiles</strong>
+(equal-sized groups), which also removes the power problem &mdash; ReMoDe only
+declares a mode when a peak is <em>significantly</em> higher than its
+neighbours, so a small subgroup returns few modes for lack of power rather than
+because it is flat.
+<br><br>
+The one place we depart from their code is modality itself: they used their
+ANAM density method, while we use the <strong>ReMoDe package</strong> &mdash; the
+successor method by the same group. ReMoDe additionally returns the
+<em>location</em> of each mode, so their &ldquo;is there a mode at the middle
+category?&rdquo; criterion (which they judged by eye from density plots) is
+evaluated automatically here. Detected modes are <strong>coloured in every
+chart</strong>, so the modality estimate can be read directly off the bars.
+Set <code>IV_BIN_METHOD</code> to <code>"quantile"</code> (5 quintiles) or
+<code>"equal_width"</code> (fixed 0&ndash;20 / 20&ndash;40 bins) to change the
+grouping.
+<br><br>
+<strong>How reliable is each classification?</strong> With roughly 29
+respondents per subgroup, a mode count can rest on a handful of people, so every
+classification that feeds the ranking is checked with
+<code>remode::remode_stability()</code>. That function <em>jackknifes</em> the
+distribution: it deletes a growing share of the data (10%, 20%, &hellip;),
+re-runs <code>remode()</code> 100 times at each step, and records the largest
+share that can be removed while the majority of resamples still recover the
+original number of modes. That figure is reported per subgroup as
+&ldquo;<em>stable to X% removal</em>&rdquo;, and a comparison is marked
+<span style="color:#B22222">&#9888; unstable</span> when either end fails to
+survive <code>IV_STABLE_MIN</code> (currently 40%).
+<ul style="margin:6px 0">
+<li><strong>Only the two subgroups that drive the ranking are tested</strong>
+    (lowest and highest), because the check is expensive; results are cached in
+    <code>analysis/reports/descriptive_plots/cache/remode_stability_cache.rds</code>, keyed on the count vector, so
+    re-knitting is instant. Delete that file to recompute &mdash; it also
+    rebuilds automatically once new data changes the counts.</li>
+<li>The displayed mode counts always use the <strong>bootstrap</strong> test,
+    which the ReMoDe paper recommends at small N. Inside the jackknife the
+    faster <strong>binomial</strong> test is used
+    (<code>IV_STAB_TEST</code>): it makes the whole grid take about a minute
+    instead of ~23 minutes, and on this data it is the <em>more conservative</em>
+    of the two, i.e. it errs towards flagging. Set it to
+    <code>"bootstrap"</code> for the slower, more exact route.</li>
+<li>Flagged items are <strong>still ranked</strong> &mdash; nothing is hidden,
+    the marker simply tells you how much weight the comparison can bear.</li>
+</ul>
+<em>Note:</em> the package's <code>location_stability</code> output is not used,
+as it currently returns empty (<code>remode_stability()</code> reads
+<code>remode_result$modes</code> while <code>remode()</code> returns
+<code>mode_indeces</code>); only <code>stable_until</code> is taken.
+</div>
+
+<div class="iv-controls">
+  <div><strong>Involvement defined by:</strong>
+    <span id="iv-def-buttons"></span>
+  </div>
+  <div class="iv-sub-row">
+    <button class="iv-navbtn" onclick="ivStep(-1)">&#9664; less</button>
+    <input type="range" id="iv-slider" min="1" max="5" step="1" value="1"
+           oninput="ivSetSub(parseInt(this.value))">
+    <button class="iv-navbtn" onclick="ivStep(1)">more &#9654;</button>
+    <span class="iv-readout" id="iv-readout"></span>
+  </div>
+  <div style="margin-top:10px;">
+    <strong>Order items:</strong>
+    <button class="sort-btn" id="iv-order-btn" data-current="survey"
+            onclick="ivToggleOrder(this)">
+      Survey order — click to sort by increase in polarisation</button>
+  </div>
+  <div class="iv-legend" id="iv-legend"></div>
+</div>
+
+<div id="iv-mount">
+  <p style="color:#999">Loading charts… if this stays blank, open the HTML file
+  directly in a web browser (Chrome / Firefox / Edge) rather than the RStudio
+  Viewer.</p>
+</div>
+```
+
+```{r involvement-data, echo=TRUE, results='asis'}
+# The analysis is in R/involvement.R; this chunk hands its result to the
+# browser, together with the script that draws the charts.
+#
+# builds iv_data: per belief and policy rule, modality by involvement subgroup
+source(here("analysis", "reports", "descriptive_plots", "R", "involvement.R"))
+
+cat('<script>window.IV_DATA = ',
+    jsonlite::toJSON(iv_data, auto_unbox = TRUE, digits = 3, na = "null"),
+    ';</script>', sep = '')
+cat('<script>',
+    paste(readLines(here("analysis", "reports", "descriptive_plots", "js", "involvement_browser.js"), warn = FALSE),
+          collapse = "\n"),
+    '</script>', sep = '\n')
+```
+
+```{=html}
+<hr>
+<h2 id="references-involvement">References</h2>
+<div class="block-box" style="font-size:0.9em">
+<p>Hoffstadt, M., Waldorp, L., Garcia-Bernardo, J., &amp; van der Maas, H. (2026).
+ReMoDe &ndash; Recursive modality detection in distributions of ordinal data.
+<em>British Journal of Mathematical and Statistical Psychology</em>.
+https://doi.org/10.1111/bmsp.70037 &middot; Software (MIT):
+https://github.com/hvdmaas/remode</p>
+
+<p>Hoffstadt, M., Smal, I., van der Maas, H., &amp; Garcia-Bernardo, J. (2025).
+Involvement as a polarizing factor? A comprehensive multi-method analysis across
+representative datasets. <em>European Journal of Social Psychology, 55</em>(2),
+193&ndash;212. https://doi.org/10.1002/ejsp.3132 &middot; Code:
+https://github.com/mfhstdt/involvement_polarization</p>
+
+<p>Lelkes, Y. (2016). Mass polarization: Manifestations and measurements.
+<em>Public Opinion Quarterly, 80</em>(S1), 392&ndash;410.</p>
+
+<p>Pavlopoulos, J., &amp; Likas, A. (2023). Distance from unimodality for the
+assessment of opinion polarization. <em>Cognitive Computation, 15</em>,
+2028&ndash;2038.</p>
+
+<p>Selke, T., Bayarri, M. J., &amp; Berger, J. O. (2001). Calibration of p values
+for testing precise null hypotheses. <em>The American Statistician, 55</em>,
+62&ndash;71.</p>
+
+<p>van der Maas, H. L. J., Dalege, J., &amp; Waldorp, L. (2020). The polarization
+within and across individuals: The hierarchical Ising opinion model.
+<em>Journal of Complex Networks, 8</em>, cnaa010.</p>
+</div>
+```

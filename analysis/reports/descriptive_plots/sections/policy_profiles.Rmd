@@ -1,0 +1,231 @@
+```{r setup-policy-profiles, include=FALSE}
+library(here)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 8, dpi = 110)
+source(here("analysis", "reports", "descriptive_plots", "R", "policy_classes.R"))   # fit_policy_classes(), policy_long()
+```
+
+```{=html}
+<h1 id="policy-profiles">Zijn er typen respondenten, of één ladder?</h1>
+
+<div class="block-box">
+<strong>De vraag.</strong> Iedereen zet dezelfde middelen in ongeveer dezelfde
+volgorde &mdash; alcohol soepel, heroïne streng. De vraag is of respondenten
+alleen verschillen in <em>hoe hoog</em> ze die ladder als geheel leggen, of dat er
+groepen zijn met een andere <em>vorm</em>: mensen die cannabis vrijgeven maar
+nicotine niet, bijvoorbeeld.
+<br><br>
+<strong>Waarom dat niet met een driedeling kan.</strong> De eerste versie van de
+figuur hieronder splitste respondenten in drie gelijke groepen naar hun
+gemiddelde slider. Die figuur gaf drie mooie parallelle lijnen op verschillende
+hoogtes &mdash; wat ze moest geven, want de splitsing zat op de hoogte. Een
+klassenmodel mag met klassen terugkomen die in vorm verschillen, of met één
+klasse, en dat zijn andere uitkomsten.
+<br><br>
+<strong>Latente profielanalyse</strong> (<code>mclust</code>, Scrucca et al.
+2016) over de acht beleidssliders: mengsels van normale verdelingen, waarbij BIC
+zowel het aantal klassen als de covariantiestructuur kiest. Pijnstillers doen
+niet mee &mdash; zie <code>LADDER_SUBSTANCES</code>.
+<br><br>
+<strong>Profielen en niet klassen, met een prijs.</strong> De sliders zijn
+continu, dus een mengsel van normalen kost acht gemiddelden per klasse, tegen
+acht keer (<em>k</em>&nbsp;&minus;&nbsp;1) responskansen voor een klassieke LCA op
+de ankers &mdash; op deze <em>n</em> niet te schatten zonder de ankers eerst samen
+te voegen. De prijs is echt, en op de soft launch groter dan in de pilots: het
+exportbestand bewaart alleen hele regels, dus <em>elk</em> antwoord ligt op een
+van de negen ankers. Dit zijn geen normaal verdeelde variabelen en de aanname
+wordt in een bekende richting geschonden. De hoofdstudie kan zich <code>poLCA</code> op
+samengevoegde ankers veroorloven als controle.
+</div>
+```
+
+```{r lpa-fit, echo=TRUE}
+fit <- fit_policy_classes(pilot)
+quality <- class_quality(fit)
+pilot$policy_class <- policy_class(pilot, fit)
+
+cat(sprintf("mclust koos %s met %d klassen, op %d van de %d respondenten.\n",
+            fit$modelName, fit$G, fit$n, nrow(pilot)))
+```
+
+```{r lpa-bic, echo=TRUE, fig.height=3.6}
+# The whole BIC surface, not just the winner. On a pilot the runners-up are
+# usually close, and how close is the thing a reader needs in order to know how
+# much the chosen G is worth.
+bic <- as.data.frame(as.table(fit$BIC[, , drop = FALSE]))
+names(bic) <- c("G", "model", "BIC")
+bic$G <- as.integer(as.character(bic$G))
+
+ggplot(bic[!is.na(bic$BIC), ], aes(G, BIC, group = model, colour = model)) +
+  geom_line(linewidth = 0.5, alpha = 0.75) +
+  geom_point(size = 1.2, alpha = 0.75) +
+  geom_point(data = data.frame(G = fit$G, BIC = max(fit$BIC, na.rm = TRUE)),
+             aes(G, BIC), inherit.aes = FALSE, size = 3.4, shape = 21,
+             stroke = 1.1, colour = "black", fill = NA) +
+  scale_x_continuous(breaks = LPA_CLASSES) +
+  labs(x = "aantal klassen", y = "BIC", colour = NULL,
+       title = "BIC per covariantiestructuur",
+       subtitle = "Hoger is beter in mclust. De cirkel is de gekozen oplossing.") +
+  theme_minimal(base_size = 9) +
+  theme(plot.title = element_text(face = "bold", size = 11),
+        plot.subtitle = element_text(colour = "grey40", size = 8.5),
+        legend.position = "right", legend.key.height = unit(9, "pt"))
+```
+
+```{r lpa-quality, echo=TRUE}
+knitr::kable(
+  data.frame(klasse = quality$table$klasse, n = quality$table$n,
+             aandeel = sprintf("%.1f%%", 100 * quality$table$aandeel),
+             `gem. posterior` = round(quality$table$gem_posterior, 3),
+             `klein (<5%)` = ifelse(quality$table$klein, "⚠", ""),
+             check.names = FALSE),
+  row.names = FALSE,
+  caption = sprintf(paste("Klassegrootte en toewijzingszekerheid.",
+                          "Relatieve entropie = %.3f."), quality$entropy))
+```
+
+```{=html}
+<div class="block-box">
+<strong>Ligt de gekozen <em>G</em> aan de rand van het rooster?</strong> Als de
+BIC-curve hierboven bij het grootste aantal klassen (<code>LPA_CLASSES</code>)
+nog stijgt, is de gekozen <em>G</em> de rand van het rooster en niet een optimum,
+en moeten de klassen hieronder niet als een aantal gelezen worden.
+<br><br>
+<strong>Lees de entropie en de klassegroottes samen.</strong> Een entropie van
+bijna 1 is geen goed nieuws: zo ziet scheiding door een handjevol uitschieters
+eruit, niet scheiding in goed afgebakende typen. Een component die
+op vijf mensen past die overal 0 invulden heeft niets om onzeker over te zijn.
+De kolom <em>klein</em> is er precies daarom &mdash; entropie alleen vleit juist
+de oplossing die gewantrouwd moet worden.
+<br><br>
+<strong>De klassen zijn genummerd, niet benoemd.</strong> Ze zijn hernummerd naar
+oplopende gemiddelde slider, zodat de nummering niet verspringt bij een refit
+(die van <code>mclust</code> zelf is willekeurig). Namen als
+&ldquo;prohibitionist&rdquo; of &ldquo;liberaal&rdquo; zouden beweren dat de
+klassen op één dimensie liggen, en dat is nu juist de vraag &mdash; de
+profieltabel hieronder laat zien of ze dat doen. Namen kunnen er komen als
+de hoofdstudie een stabiele oplossing heeft.
+</div>
+```
+
+```{r lpa-profiles, echo=TRUE}
+profiles <- class_profiles(pilot, pilot$policy_class)
+profiles$gemiddelde <- round(profiles$gemiddelde, 1)
+
+knitr::kable(
+  reshape(profiles[c("klasse", "middel", "gemiddelde")], direction = "wide",
+          idvar = "klasse", timevar = "middel"),
+  row.names = FALSE, col.names = c("klasse", levels(profiles$middel)),
+  caption = paste("Gemiddelde beleidsslider per middel per klasse. Lees de",
+                  "rijen als vormen, niet als hoogtes."))
+```
+
+```{=html}
+<h2 id="policy-ladders">De ladder, ongesplitst en per klasse</h2>
+
+<div class="block-box">
+<strong>Eén lijn per respondent</strong>, over de acht middelen in dezelfde
+volgorde als de ridgeline hierboven. De eerste figuur is iedereen bij elkaar en
+is de vergelijkingsbasis: als het klassenmodel niets toevoegt, ziet de tweede
+figuur er uit als drie of zes willekeurige doorsnedes hiervan.
+<br><br>
+<strong>De dikke lijn is de mediaan</strong>, niet het gemiddelde: op een
+verdeling met een piek tegen 0 aan ligt het gemiddelde structureel boven de
+massa. De stippellijn in de gesplitste figuur is de mediaan van iedereen, zodat
+elke klasse tegen dezelfde referentie te lezen is.
+</div>
+```
+
+```{r ladder-pooled, echo=TRUE, fig.height=4.0}
+ladder <- policy_long(pilot, LADDER_SUBSTANCES)
+ladder_median <- aggregate(beleid ~ middel, ladder, median)
+
+# geom_line over ResponseId: the individual profile is the unit here, so every
+# respondent is one polyline. The alpha is what makes 120 of them readable -
+# where lines coincide the ink adds up, which is the density this figure is for.
+ggplot(ladder, aes(as.integer(middel), beleid)) +
+  geom_line(aes(group = ResponseId), colour = "#2E6F8E", alpha = 0.16,
+            linewidth = 0.45) +
+  geom_line(data = ladder_median, aes(as.integer(middel), beleid),
+            colour = "#17384a", linewidth = 1.5) +
+  scale_x_continuous(breaks = seq_along(levels(ladder$middel)),
+                     labels = levels(ladder$middel),
+                     expand = expansion(add = 0.1)) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  labs(x = NULL, y = "beleidsvoorkeur",
+       title = "De ladder per respondent",
+       subtitle = sprintf("Eén lijn per respondent (n = %d). Dikke lijn: mediaan.",
+                          length(unique(ladder$ResponseId)))) +
+  theme_minimal(base_size = 9) +
+  theme(plot.title = element_text(face = "bold", size = 11),
+        plot.subtitle = element_text(colour = "grey40", size = 8.5),
+        axis.text.x = element_text(angle = 35, hjust = 1),
+        panel.grid.minor = element_blank())
+```
+
+```{r ladder-by-class, echo=TRUE, fig.height=5.2}
+ladder$klasse <- pilot$policy_class[match(ladder$ResponseId, pilot$ResponseId)]
+by_class <- ladder[!is.na(ladder$klasse), ]
+class_median <- aggregate(beleid ~ middel + klasse, by_class, median)
+
+# The class n goes in the strip label rather than a caption: a panel of five
+# respondents and a panel of thirty-six should not look equally authoritative,
+# and the reader should not have to look the number up elsewhere. Counted over
+# ResponseId rather than over rows, because a respondent who left one slider
+# blank contributes seven rows and not eight.
+n_per_class <- tapply(by_class$ResponseId, by_class$klasse,
+                      function(id) length(unique(id)))
+levels(by_class$klasse) <- sprintf("%s  (n = %d)", levels(by_class$klasse),
+                                   n_per_class)
+levels(class_median$klasse) <- levels(by_class$klasse)
+
+# `ladder_median` carries no `klasse` column, so ggplot draws this layer in
+# EVERY panel - which is what a shared reference line should do.
+ggplot(by_class, aes(as.integer(middel), beleid)) +
+  geom_line(data = ladder_median, aes(as.integer(middel), beleid),
+            colour = "grey35", linetype = "dashed", linewidth = 0.6) +
+  # One colour, not one per class: the panel strip already says which class this
+  # is, so a colour scale would encode the same variable twice - and its darkest
+  # steps came out indistinguishable from the dashed reference line.
+  geom_line(aes(group = ResponseId), colour = "#2E6F8E", alpha = 0.28,
+            linewidth = 0.45) +
+  geom_line(data = class_median, aes(as.integer(middel), beleid),
+            colour = "#17384a", linewidth = 1.5) +
+  facet_wrap(~ klasse) +
+  scale_x_continuous(breaks = seq_along(levels(by_class$middel)),
+                     labels = levels(by_class$middel),
+                     expand = expansion(add = 0.1)) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  labs(x = NULL, y = "beleidsvoorkeur",
+       title = "Dezelfde lijnen, gesplitst naar latente klasse",
+       subtitle = paste("Dikke lijn: mediaan van de klasse.",
+                        "Stippellijn: mediaan van iedereen.")) +
+  theme_minimal(base_size = 9) +
+  theme(plot.title = element_text(face = "bold", size = 11),
+        plot.subtitle = element_text(colour = "grey40", size = 8.5),
+        strip.text = element_text(face = "bold", size = 8.5),
+        # The panels sit close enough that the last tick label of one runs into
+        # the first of the next; the gap is what separates them, not a smaller font.
+        panel.spacing.x = unit(14, "pt"),
+        axis.text.x = element_text(angle = 40, hjust = 1, size = 6.2),
+        panel.grid.minor = element_blank())
+```
+
+```{=html}
+<div class="block-box">
+<strong>Hoeveel gewicht deze oplossing kan dragen: weinig.</strong> Zes klassen
+op ruim honderd respondenten, waarvan de kleinste vijf mensen telt. Dat is niet
+de oplossing die de hoofdstudie gaat opleveren, en de klassen die hier uit komen
+moeten niet worden geïnterpreteerd alsof ze bestaan. Wat de figuur wél laat zien
+is dat de klassen die BIC kiest <em>niet</em> alleen in hoogte verschillen &mdash;
+er zitten klassen tussen die cannabis en nicotine tegengesteld behandelen &mdash;
+en dat is precies de vraag waarvoor het model hier staat.
+<br><br>
+<strong>Wat er in de hoofdstudie bij hoort</strong> voordat dit een resultaat is:
+een oplossing met klassen boven de vijf procent, een bootstrapped likelihood-ratio
+toets op het aantal klassen (<code>LPA_BOOTSTRAP</code>, hier op 0 omdat 999
+replicaties minuten kosten), en de <code>poLCA</code>-controle op samengevoegde
+ankers uit de kop van <code>R/policy_classes.R</code>.
+</div>
+```

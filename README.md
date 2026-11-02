@@ -23,9 +23,12 @@ analysis/
     A2_attitudes.R             Appendix: correlations between policy and the attitude items
     utils/                     helpers sourced by other scripts (party logos, party-map scores)
     exploratory/               analyses that are not (yet) in the paper, see below
+  reports/
+    descriptive_plots/         descriptive report of the main study (item checks, involvement,
+                               analyses), see below
   data/                        survey data: NOT in the repo (see "Data")
   ratings/                     hand ratings used by exploratory/modality/ (tracked)
-  assets/                      codebook and party logos
+  assets/                      codebook, party logos and the questionnaire (.qsf)
   icons/                       icons of the nine answer options (as shown in the survey)
   output/                      output of the exploratory scripts (not tracked, regenerate locally)
 ```
@@ -64,7 +67,8 @@ the CBS boundaries to `analysis/data/coropgebied.geojson` if missing).
 The repository is public, so the survey data are **never committed** (`.gitignore` excludes
 `analysis/data/`, `*.sav`, `*.rds` (fitted models contain the data) and csv files under `analysis/`
 other than the hand ratings in `analysis/ratings/`). Ask Timo van Ommeren for
-`NLOZ26-10_Drugsbeleid_gedeeld_261022.sav`. The variable codebook is in `analysis/assets/`.
+`NLOZ26-10_Drugsbeleid_gedeeld_261022.sav` (the paper scripts), and for the descriptive report also
+`NLOZ26-10_Drugsbeleid_gedeeld_261022.csv` and `NLOZ26-10_Drugsbeleid_in progress_gedeeld_261022.csv`. The variable codebook is in `analysis/assets/`.
 
 Conventions used throughout (set in `00_load_and_clean.R`):
 
@@ -90,3 +94,31 @@ drug histograms in random order. You mark their modality or local maxima, and th
 `analysis/ratings/` (tracked, since they are manual work). `modality_by_party.R`,
 `party_map_drug_modes.R` and `party_map_pair_modes.R` build on these ratings, and `party_map_modes.R`
 compares them with automated checks (`remode`).
+
+## Descriptive report
+
+`analysis/reports/descriptive_plots/descriptive_plots.Rmd` is an interactive HTML report on the main
+study: every item per demographic split, involvement × bimodality, and exploratory analyses (policy
+profiles, correlations, PCA, factor analysis, linearity, linear models, response times). Render it
+from the project root:
+
+```r
+rmarkdown::render("analysis/reports/descriptive_plots/descriptive_plots.Rmd")
+```
+
+The HTML lands next to the Rmd and is not tracked. Structure:
+
+| Path | What it holds |
+|---|---|
+| `descriptive_plots.Rmd` | the report shell: setup, tabs, styling, final checks |
+| `sections/` | one child document per section, in report order |
+| `R/data.R` | reads the delivery and the QSF and builds `pilot` (one row per completed interview), the item lists and labels |
+| `R/plot_helpers.R` | generic helpers (titles, scales, slider anchors, item selection) |
+| `R/<analysis>.R` | one file per analysis section (`involvement.R`, `PCA.R`, `policy_classes.R`, ...) |
+| `js/` | the two in-browser chart viewers, inlined into the HTML |
+| `cache/` | the ReMoDe stability cache (not tracked; recomputed if missing, about a minute) |
+
+The sections were written for the pilot reports, so the dataset is called `pilot` and some
+variable names follow the pilots. Extra packages: `remode`, `psych` (with `GPArotation`), `mclust`,
+`jsonlite`, `svglite`, `sessioninfo`, `rmarkdown`. The involvement section includes three helper
+functions from Hoffstadt et al. (github.com/mfhstdt/involvement_polarization, MIT).

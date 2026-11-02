@@ -1,0 +1,589 @@
+```{r setup-descriptives, include=FALSE}
+library(here)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 7, dpi = 110)
+```
+
+# Purpose of this document
+
+This report is an **item check** of the main study, not a substantive analysis. For every survey
+item it shows a simple descriptive plot so I can inspect whether the items
+behave as intended: Did respondents understand the question? Does the phrasing
+push people towards a particular answer? Are the response options being used?
+No scales are computed and no hypotheses are tested here.
+
+**How labels are handled.** The panel agency fielded the main study in its own
+software and delivered CSV files of numeric codes. Question wording and answer
+labels are read from the main-study survey definition
+(`analysis/assets/main_study_10_05_fixed.qsf`), in the order the agency numbered the
+columns. The agency's own demographic recodes are not in the QSF: their codes
+are labelled from the value labels in the agency's .sav file, which documents them.
+
+**Where the data comes from.** `analysis/data/` holds the agency's export, which
+carries no names or panel identifiers beyond an interview id; it is not
+version controlled.
+
+
+:::: {.block-box}
+**Provenance of the input files.** Dates below are filesystem last-modified
+times (a proxy, not a confirmed Qualtrics export or authorship date — to be
+replaced with the actual record once available):
+
+- `analysis/data/NLOZ26-10_Drugsbeleid_gedeeld_261022.csv` and
+  `..._in progress_gedeeld_261022.csv` — the full main study, delivered
+  22 October 2026: completed interviews (with survey weights) and unfinished
+  ones in two files. The soft launch's interviews are among them. The `.sav`
+  copy of the completed file supplies the value labels of the demographics.
+- **This report was rendered from:** `r DELIVERY$label`.
+- `analysis/assets/main_study_10_05_fixed.qsf` — the main-study survey definition, used for
+  item wording, answer labels and the positions of the nine policy rules
+  (file mtime 2026-10-05).
+- `analysis/reports/descriptive_plots/R/data.R` — the column map from the agency's names to
+  the report's, and the Pro/Anti direction of every belief and behaviour item.
+::::
+
+# Data cleaning
+
+Cleaning is one step, and **everything in this report — all four tabs — uses
+the result**.
+
+The agency records the **state** of every interview: *Completed*, or
+*InProgress* for an interview that was started and not finished. Only completed
+interviews are analysed. Within them, *geen mening* (code 99) is kept as a
+missing answer rather than removing the respondent.
+
+```{r response-type-overview}
+# Counts of each response type BEFORE filtering, so the cleaning is transparent.
+# Counted from the VALUES file, the up-to-date source of truth. `status_scale`
+# turns the numeric Status codes into readable names and comes from the data
+# layer, which is the only thing that knows where this survey's labels live.
+#
+# A POOLED dataset has no raw export behind it - it is two already-cleaned
+# samples stacked - so `data_values` is absent there and the table is skipped
+# rather than faked. Each pilot's own report still shows its own filtering.
+if (!exists("data_values")) {
+  cat("Not shown here: this report pools two samples that were each filtered",
+      "in their own report, so there is no single raw export to count.
+")
+} else {
+  data_values |>
+    dplyr::mutate(`Response type` = status_scale$label[match(Status, status_scale$code)]) |>
+    dplyr::count(`Response type`, name = "Rows") |>
+    dplyr::arrange(dplyr::desc(Rows))
+}
+```
+
+```{r cleaning-cost, echo=TRUE}
+# Where the removed respondents were losing data, so the cost of listwise
+# deletion is visible rather than a single number. `dropped` and REQUIRED_COLS
+# come from R/data.R.
+if (nrow(dropped) > 0) {
+  # Counted per column rather than by colSums() over a matrix: with exactly one
+  # dropped respondent sapply() returns a vector, not a 1-row matrix, and
+  # colSums() then fails. vapply() keeps its shape whatever the number.
+  missing_by_question <- sort(vapply(dropped[REQUIRED_COLS],
+                                     function(x) sum(blank_is_na(x)), integer(1)),
+                              decreasing = TRUE)
+  missing_by_question <- missing_by_question[missing_by_question > 0]
+  knitr::kable(
+    data.frame(question = names(missing_by_question),
+               `respondents missing it` = as.integer(missing_by_question),
+               check.names = FALSE)[seq_len(min(10, length(missing_by_question))), ],
+    row.names = FALSE,
+    caption = paste0("Where the ", nrow(dropped),
+                     " removed respondents had missing answers (top 10)"))
+}
+```
+
+### The emotion question
+
+The agency exports the emotion question as **one binary variable per emotion ×
+topic** — the form an attitude network needs, where each emotion is its own
+node. The pilots' one-cell-per-topic form (e.g. `"1,2"`) is rebuilt from it with
+the QSF's own answer codes, for the frequency table and the combination charts
+below.
+
+
+This yields **`r ncol(emotions_binary) - 1` binary variables**
+(`r length(emotion_cols)` topics × `r nrow(emotion_scale)` emotions), named
+`topic_emotion` (e.g. `harddrugs_bang_bezorgd`), each 1 = ticked, 0 = not
+ticked, `NA` = the topic was not answered. They are available to every analysis
+in this report as `emotions_binary`, keyed by `ResponseId`, and they are merged
+into the single analysis dataset assembled next.
+
+### One analysis dataset
+
+Cleaning and transformation end here. Everything above is assembled into a
+single respondent-level dataset, **`pilot`** — one row per analysed respondent,
+every variable converted to its proper type once and every derived variable
+computed once. That is the dataset the rest of this report reads, and the one
+a network analysis should use: each belief, behaviour, slider and emotion
+binary is a candidate node, and the grouping variables are covariates.
+
+
+```{r dataset-shape, echo=TRUE}
+# What `pilot` contains, by column group.
+#
+# The derived groupings are counted as the BALANCE rather than written out as a
+# number. A hand-written count goes stale the moment a grouping is added - it
+# was two short by the time anyone looked - and a table of column counts that
+# does not add up to the number of columns is worse than no table. The
+# assertion is what makes the balance meaningful: if any other row is wrong,
+# this fails rather than absorbing the error into the last row.
+counted <- c(`identity / metadata`        = 3L,
+             `demographic codes`          = length(demo_cols),
+             `beliefs + behaviour`        = length(likert_cols),
+             `reverse-scored copies`      = length(likert_cols),
+             `policy sliders`             = length(slider_cols),
+             `involvement`                = length(invol_cols) + 1L,
+             `substance use`              = length(subst_cols),
+             `emotion cells (raw text)`   = length(emotion_cols),
+             `emotion x topic binaries`   = ncol(emotions_binary) - 1L)
+stopifnot(sum(counted) <= ncol(pilot))
+
+tibble::tibble(
+  `column group` = c(names(counted), "derived groupings"),
+  columns        = c(unname(counted), ncol(pilot) - sum(counted))
+) |>
+  knitr::kable(caption = paste0("`pilot`: ", nrow(pilot), " respondents x ",
+                                ncol(pilot), " columns"))
+```
+
+:::: {.block-box}
+**What the survey definition (.qsf) and the export tell us about the data.**
+The QSF is the specification the agency programmed from; the export is what was
+fielded. Worth keeping in mind when reading everything below:
+
+- **"Geen mening" is code 99.** The QSF offers a no-opinion option on the policy
+  sliders and the involvement sliders; the agency's export also carries 99 on
+  the belief and behaviour statements, which the QSF does not offer. Every 99 is
+  set to missing.
+- **The policy question stores whole rules.** The QSF slider runs 0-100 with its
+  nine rules at 0, 12.5, &hellip;, 100; the agency stored the rule chosen (1-9).
+  Rule *k* is placed at the position the instrument gives it,
+  (*k*&nbsp;&minus;&nbsp;1)&nbsp;&times;&nbsp;12.5, so the charts and tables below
+  read on the slider's own 0-100 scale. No answer lies between two rules.
+- **Substance use is the only question that does not force a response** in the
+  QSF. Blanks there would be genuine refusals.
+- **Item order is randomised** within beliefs, behaviour, substance use and the
+  policy sliders in the QSF. The numbering used in this report is the
+  questionnaire's item order, not the order respondents saw.
+- **There is no display or skip logic anywhere in the QSF.** That matters for
+  the planned network analysis: skip-structures induce artefactual dependencies
+  and are a known problem for network estimation (Burger et al., 2022).
+- **The involvement block has five sliders in the export**, `betrokkenheid_1`,
+  `_1b`, `_2`, `_2b` and `_3`; the QSF has the first, third and fifth. All five
+  are analysed. 1b and 2b are shown under their variable names.
+- **Demographics are the agency's recodes.** `age_7_rec` uses the QSF's seven age
+  bands, so it carries those labels; the agency's `.sav` labels its codes with
+  the same bands. Sex, education, urbanisation and vote recall carry the value
+  labels of the agency's .sav.
+::::
+
+Of the `r n_genuine` interviews started, **`r n_pilot` were completed** and form
+the analysis sample used throughout this report; `r n_genuine - n_pilot` were
+not completed and are not analysed. Every plot and every analysis is based on
+the same `r n_pilot` people; the *n* per item can be lower where someone chose
+*geen mening*. Answer scales come from the QSF, so every scale point is shown
+even if nobody in the main study used it.
+
+# Response metadata: completion time & language
+
+:::: {.block-box}
+Two quick data-quality checks on the `r n_pilot` completed interviews before the
+item plots: how long each respondent took, and which survey language they used.
+Very short completion times can flag respondents who clicked through without
+reading.
+::::
+
+```{r duration, fig.height=3.2}
+# One bar per respondent, sorted fastest -> slowest, in minutes.
+print(plot_duration_bars(pilot$duration_sec,
+                         title = "Completion time per respondent"))
+```
+
+```{r language, results='asis'}
+# The agency's export records no survey language.
+if (is.null(pilot$UserLanguage)) {
+  cat("*Survey language used:* not in the agency's export.\n")
+} else {
+  language_counts <- count_values(pilot$UserLanguage)
+  print(plot_bar_horizontal(language_counts, "Survey language used",
+                            n_valid = attr(language_counts, "n_valid")))
+}
+```
+
+# 1. Consent & background questions
+
+:::: {.block-box}
+The respondent-background variables the agency delivered, shown as
+horizontal bars. These are a quick sanity check that the sample looks the way it
+should. Age carries the QSF's bands; the others carry the value labels of the agency's .sav.
+::::
+
+```{r background, fig.height=3}
+# `demo_cols` comes from the data layer, so this follows whichever pilot is
+# loaded: the second survey dropped "Hoe heb je deze survey gevonden?" (Q22) and
+# added `opleiding`, highest completed education. A list repeated here would
+# have to be kept in step by hand.
+for (col in demo_cols) {
+  column <- pilot[[col]]
+  # A DEMOGRAPHIC COLUMN NOW HOLDS ITS ANSWER, NOT ITS CODE. `leeftijd` reads
+  # "25-34 jaar" rather than 2, so decoding it against question_scale()'s codes
+  # matches nothing and every respondent lands in NA - which is exactly what
+  # these charts did after the relabelling, in all three reports, showing eight
+  # empty bars and n_valid respondents missing.
+  #
+  # The levels ARE the answer options, in survey order, so they are counted
+  # directly. Passing them as `ordered_levels` keeps options nobody chose
+  # visible, which is the whole point of showing the scale rather than the data.
+  ct <- if (is.factor(column)) count_values(column, levels(column))
+        else tabulate_question(pilot, col, question_scale(col))
+  print(plot_bar_horizontal(ct, wording[[col]],
+                            n_valid = attr(ct, "n_valid")))
+}
+```
+
+
+# 2. Beleidsvoorkeur, opvattingen, gedrag, gebruik, emoties en betrokkenheid
+
+```{r political-split-sizes, echo=TRUE}
+# The largest and smallest vote-recall group, named in the paragraph below as
+# the clearest example of how unequal the groups are. Read off the same column
+# the interactive charts split on, so the two can never drift apart.
+vote_sizes <- table(pilot$stemherinnering)
+n_links  <- max(vote_sizes); n_links_code  <- names(which.max(vote_sizes))
+n_rechts <- min(vote_sizes); n_rechts_code <- names(which.min(vote_sizes))
+```
+
+:::: {.block-box}
+All item questions are drawn below. Two things are worth knowing.
+
+**The charts are interactive.** Use the buttons to split every question by
+**demografie**, **middelengebruik** or **emotie**; the button colours mark the
+three families.
+
+Because the groups differ in size, the grouped splits show the **percentage
+within each group** rather than raw counts — otherwise the comparison would
+mostly reflect how many people are in each group. The **emotion charts are the
+exception and show counts**: that question allows more than one answer, so a
+respondent can appear in several bars at once and the bars do not add up to the
+group — a percentage there would invite being read as a share of the group when
+it is nothing of the kind. The **as:** button switches the remaining charts
+between the two, for when the underlying numbers matter more than
+comparability. Age is shown as **stacked counts**, so each bar keeps its total
+height while showing its age composition; education is stacked the same way.
+Respondents who fall outside a split (a missing code, or *geen mening* on the
+MDMA slider) are excluded from that view and counted underneath it.
+
+**Group sizes.** The legend prints the *n* of every group beside its colour,
+and it is worth reading: the groups differ a great deal in size
+(stemherinnering `r n_links_code`: `r n_links`, `r n_rechts_code`:
+`r n_rechts`), so a percentage in a small group
+rests on a handful of respondents and moves several points if one of them
+answers differently. Comparisons between the small groups are indicative at
+best.
+
+**Two question types get extra treatment.** The policy question is shown in its
+**nine rules** (bin edges half-way between the labelled anchors), with the
+**distribution drawn behind the bars** as a smoothed curve at low opacity. Substance use carries an explicit
+**"overgeslagen"** category so refusals stay visible rather than disappearing.
+::::
+
+:::: {.block-box}
+**Definition of the substance split.** The main study asks own use for four
+substance **groups** &mdash; alcohol, tabak (en vapes), softdrugs and harddrugs
+&mdash; each with the same four answers: **nooit**, **niet (in het laatste
+jaar)**, **wel eens (in het laatste jaar)** and **vaak (in het laatste jaar)**.
+
+**middelengebruik** — the substance ladder of pilot 2, on the heaviest group a
+respondent has *ever* used, whatever the frequency:
+
+| groep | definitie |
+|:--|:--|
+| **nooit** | never used any of the four groups |
+| **legaal** | alcohol or tabak, never softdrugs or harddrugs |
+| **cannabis** | softdrugs, never harddrugs |
+| **hard drugs** | harddrugs |
+
+Each label names the **heaviest** group a respondent reaches, so someone in
+*hard drugs* may also drink. *cannabis* is the agency's *softdrugs* group, under
+the label pilot 2's ladder used.
+::::
+
+:::: {.block-box}
+**No emotion splits.** The emotion question allows more than one answer per
+topic, so groups formed from it overlap: a respondent who ticked two emotions
+would sit in two bars, and the bars would not sum to anything. The pilot-2
+report did not offer them for that reason, and neither does this one. The
+emotion answers themselves are drawn in section 2.5.
+::::
+
+```{r desc-splits, echo=FALSE}
+# Computed once here and reused by the button chunk below - build_demographics()
+# walks every grouping column, and calling it twice on one page was a bug once.
+demo_splits <- build_demographics(pilot)
+```
+
+```{=html}
+<div class="iv-controls" style="top:46px">
+  <div class="split-row">
+    <button class="desc-split-btn sort-btn active fam-all" onclick="descSetSplit('all',this)">alle respondenten</button>
+    <span class="fam-label fam-demo-txt">demografie</span>
+    <button class="desc-split-btn sort-btn fam-demo" onclick="descSetSplit('politics',this)">stemherinnering</button>
+    <button class="desc-split-btn sort-btn fam-demo" onclick="descSetSplit('gender',this)">geslacht</button>
+    <button class="desc-split-btn sort-btn fam-demo" onclick="descSetSplit('age',this)">leeftijd</button>
+```
+
+```{r desc-split-buttons, echo=FALSE, results='asis'}
+# Every split button after the demographic three, generated from whatever
+# build_demographics() actually offers for this pilot. Written out by hand they
+# drifted twice: the second pilot was still being offered `gebruiksgeschiedenis`
+# and an emotion topic it does not have, both of which did nothing when clicked.
+#
+# A family heading is printed only if that family has buttons, so an empty
+# "emotie over" label cannot be left behind either.
+labels <- demo_splits          # built in desc-splits above
+
+families <- list(
+  # Offered only by the pooled dataset, which is the only one that holds more
+  # than one wave. It comes first because it is the split to look at before any
+  # of the others: pooling two samples is only defensible if they answer alike.
+  list(css = "fam-all",   heading = "steekproef",
+       keys = intersect("pilot", names(labels))),
+  list(css = "fam-subst", heading = "middelen",
+       keys = intersect(c("substance", "history"), names(labels))),
+  list(css = "fam-demo",  heading = "overig",
+       keys = intersect(c("opleiding", "stad", "mdma"), names(labels))),
+  list(css = "fam-emo",   heading = "emotie over",
+       keys = c(grep("^emo_", names(labels), value = TRUE),
+                intersect("affect", names(labels))))
+)
+
+button_label <- function(key) {
+  # The emotion splits label themselves "Emotie: harddrugs"; the family heading
+  # already says that, so only the topic is needed on the button. The key is the
+  # COLUMN STEM (`emo_alc`), so it goes through EMOTION_TOPIC_LABELS - stripping
+  # the prefix off the stem gives "alc", which is not a word.
+  if (key %in% names(EMOTION_TOPIC_LABELS)) unname(EMOTION_TOPIC_LABELS[key])
+  else tolower(labels[[key]]$label)
+}
+
+for (family in families) {
+  if (!length(family$keys)) next
+  cat(sprintf("<span class=\"fam-label %s-txt\">%s</span>",
+              family$css, family$heading))
+  for (key in family$keys)
+    cat(sprintf("<button class=\"desc-split-btn sort-btn %s\" onclick=\"descSetSplit('%s',this)\">%s</button>",
+                family$css, key, button_label(key)))
+}
+```
+
+```{=html}
+    &nbsp;<button class="sort-btn" onclick="descToggleCounts(this)">as: % binnen groep</button>
+  </div>
+  <div class="iv-legend" id="desc-legend"></div>
+</div>
+```
+
+## 2.1 Beleidsvoorkeur (9 beleidsregels + geen mening)
+```{r freq-beleid}
+# Centre and spread per slider. The sliders run 0-100, so a table of ten count
+# columns says less than the mean and SD do; the charts below carry the shape.
+knitr::kable(block_descriptives(pilot, slider_cols, wording = wording),
+             caption = paste("Beleidsvoorkeur per middel (0 = verbod,",
+                             "100 = vrije verkoop; regel k staat op",
+                             "(k - 1) x 12,5). N telt alleen respondenten",
+                             "met een mening: code 99 is 'Geen mening'."))
+```
+
+
+```{r policy-no-opinion, echo=TRUE}
+# "Geen mening" is exported as code 99 and is NA in `pilot`, so it is counted
+# explicitly here and shown as its own category in the charts.
+no_opinion <- data.frame(
+  substance = sapply(POLICY_COLUMNS, function(v) item_title(wording[[v]])),
+  # code 99 is "Geen mening"; in `pilot` that is simply NA
+  `geen mening (n)` = sapply(pilot[POLICY_COLUMNS], function(x) sum(is.na(x))),
+  check.names = FALSE, row.names = NULL
+)
+no_opinion$`geen mening (%)` <- round(100 * no_opinion$`geen mening (n)` /
+                                        nrow(pilot), 1)
+knitr::kable(no_opinion, row.names = FALSE,
+             caption = paste0("Respondenten die 'Geen mening' kozen (N = ",
+                              nrow(pilot), ")"))
+```
+
+```{=html}
+<div id="desc-block-beleid_voorkeur"></div>
+```
+
+## 2.2 Opvattingen (beliefs)
+```{r freq-beliefs}
+# Centre and spread per item, as a paper would report a rating scale. These are
+# the RAW answers, not the reverse-scored copies: this is what respondents
+# ticked, so a low mean on a negatively worded item means agreement with it.
+knitr::kable(block_descriptives(pilot, select_items("beliefs", names(pilot)),
+                                wording = wording),
+             caption = paste0("Opvattingsitems (", SCALE_MIN, " = helemaal mee",
+                              " oneens, ", SCALE_MAX, " = helemaal mee eens),",
+                              " ruwe antwoorden."))
+```
+
+
+```{=html}
+<button class="sort-btn" onclick="descToggleOrder('beliefs',this)">Volgorde: vragenlijst</button>
+<div id="desc-block-beliefs"></div>
+```
+
+## 2.3 Gedrag
+```{r freq-gedrag}
+# Frequency table for this block: a row per item, a column per response
+# option. Read exact counts here; use the charts below for shape.
+# The pooled dataset has no gedrag block at all: pilot 1's four behaviour items
+# were replaced by three new ones, so none of them is common to both pilots.
+gedrag_items <- select_items("gedrag_beleid", names(pilot))
+if (!length(gedrag_items)) {
+  cat("No gedrag items: none of them is asked in both pilots.
+")
+} else {
+  knitr::kable(block_frequencies(pilot, gedrag_items,
+                                 question_scale(gedrag_items), wording = wording),
+               caption = "Antwoordverdeling per gedragsitem")
+}
+```
+
+
+```{=html}
+<button class="sort-btn" onclick="descToggleOrder('gedrag_beleid',this)">Volgorde: vragenlijst</button>
+<div id="desc-block-gedrag_beleid"></div>
+```
+
+## 2.4 Middelengebruik
+```{r freq-gebruik}
+# Frequency table for this block: a row per item, a column per response
+# option. Read exact counts here; use the charts below for shape.
+# From `pilot` rather than the raw export: the substance items live there as
+# use levels now, and `substance_scale` is the answer scale keyed to match.
+knitr::kable(block_frequencies(pilot, subst_cols, substance_scale,
+                              wording = wording),
+             caption = "Antwoordverdeling per middel")
+```
+
+
+```{=html}
+<button class="sort-btn" onclick="descToggleOrder('gebruik',this)">Volgorde: vragenlijst</button>
+<div id="desc-block-gebruik"></div>
+```
+
+## 2.5 Emoties per onderwerp
+```{r freq-emoties}
+# Frequency table for this block: a row per item, a column per response
+# option. Read exact counts here; use the charts below for shape.
+knitr::kable(block_frequencies(pilot, emotion_cols, emotion_scale, multi = TRUE,
+                              wording = wording),
+             caption = "Aantal keer aangekruist per onderwerp (meerdere antwoorden mogelijk)")
+```
+
+
+Share of respondents ticking each emotion (an emotion can be ticked together
+with others, so the bars need not sum to 100%).
+
+```{=html}
+<div id="desc-block-emotions"></div>
+```
+
+### Elke combinatie van emoties
+
+Every distinct combination a respondent actually gave, per topic — so a mixed
+answer such as *bang / bezorgd + blij* is visible as its own response option
+rather than being split across two bars.
+
+```{r emotion-combinations, echo=TRUE, fig.height=3.4}
+# One horizontal bar per observed combination, per topic. The emotion codes in a
+# cell are sorted first so that "2,4" and "4,2" count as the same combination.
+for (i in seq_along(emotion_cols)) {
+  combo <- sapply(strsplit(pilot[[emotion_cols[i]]], ","), function(z)
+    paste(emotion_scale$label[match(sort(as.numeric(trimws(z))),
+                                    as.numeric(emotion_scale$code))],
+          collapse = " + "))
+  tab <- as.data.frame(table(combination = combo), stringsAsFactors = FALSE)
+  tab <- tab[order(tab$Freq), ]
+  tab$combination <- factor(tab$combination, levels = tab$combination)
+
+  print(
+    ggplot(tab, aes(x = Freq, y = combination)) +
+      geom_col(fill = "#3B6EA5", width = 0.75) +
+      geom_text(aes(label = Freq), hjust = -0.3, size = 3, colour = "grey20") +
+      scale_x_continuous(expand = expansion(mult = c(0, 0.12))) +
+      # a combination of three emotions makes a long label; wrap rather than
+      # let it run past the panel
+      scale_y_discrete(labels = scales::label_wrap(38)) +
+      # EMOTION_TOPIC_LABELS turns the column stem back into the survey's own
+      # topic name; `emo_alc` is a column name, not something to show a reader.
+      labs(title = paste0("Emotiecombinaties — ",
+                          EMOTION_TOPIC_LABELS[[emotion_cols[i]]]),
+           subtitle = paste0(nrow(tab), " verschillende combinaties, n = ",
+                             sum(tab$Freq), " respondenten"),
+           x = "aantal respondenten", y = NULL) +
+      theme_minimal(base_size = 11) +
+      theme(plot.title = element_text(face = "bold", size = 11),
+            plot.subtitle = element_text(colour = "grey40", size = 9),
+            panel.grid.major.y = element_blank())
+  )
+}
+```
+
+## 2.6 Betrokkenheid
+```{r freq-betrokkenheid}
+# Frequency table for this block: a row per item, a column per response
+# option. Read exact counts here; use the charts below for shape.
+knitr::kable(block_frequencies(pilot, invol_cols, question_scale(invol_cols),
+                              wording = wording),
+             caption = "Verdeling over de schuifbalk, in stappen van 10")
+```
+
+
+```{=html}
+<div id="desc-block-betrokkenheid"></div>
+```
+
+```{r descriptives-data, echo=TRUE, results='asis'}
+# The cube itself is built in R/descriptives_cube.R; this chunk only hands it
+# to the browser, together with the script that draws the charts.
+source(here("analysis", "reports", "descriptive_plots", "R", "descriptives_cube.R"))
+
+cat('<script>window.DESC_DATA = ',
+    jsonlite::toJSON(desc_data, auto_unbox = TRUE, digits = 3, na = "null"),
+    ';</script>', sep = '')
+cat('<script>', paste(readLines(here("analysis", "reports", "descriptive_plots", "js", "descriptives_browser.js"), warn = FALSE),
+                      collapse = "\n"), '</script>', sep = '\n')
+```
+
+---
+
+*Generated for main-study item inspection. Data from the panel agency's
+export in `analysis/data/`; answer labels and question wording from the
+main-study QSF; helper functions in `analysis/reports/descriptive_plots/R/`.*
+
+```{=html}
+<hr>
+<h2 id="references-report">References</h2>
+<div class="block-box" style="font-size:0.9em">
+<p>R Core Team (2024). <em>R: A Language and Environment for Statistical
+Computing.</em> R Foundation for Statistical Computing, Vienna.
+https://www.R-project.org/</p>
+
+<p>Wickham, H. (2016). <em>ggplot2: Elegant Graphics for Data Analysis.</em>
+Springer-Verlag New York.</p>
+
+<p>Xie, Y., Allaire, J. J., &amp; Grolemund, G. (2018). <em>R Markdown: The
+Definitive Guide.</em> Chapman &amp; Hall/CRC.</p>
+
+<p>&Zcaron;uljevi&cacute;, M. F., Buljan, I., Leskur, M., Kaliterna, M., Hren, D.,
+&amp; Duplan&ccaron;i&cacute;, D. (2022). Validation of a new instrument for
+assessing attitudes on psychedelics in the general population.
+<em>Scientific Reports, 12</em>, 18225.
+https://doi.org/10.1038/s41598-022-23056-5</p>
+</div>
+```

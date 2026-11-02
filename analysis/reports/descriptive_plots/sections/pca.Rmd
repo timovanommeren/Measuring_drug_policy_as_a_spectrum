@@ -1,0 +1,134 @@
+```{r setup-pca, include=FALSE}
+library(here)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 7, dpi = 110)
+source(here("analysis", "reports", "descriptive_plots", "R", "PCA.R"))    # pca_block(), BLOCKS, thresholds
+```
+
+```{=html}
+<h1 id="per-block-pca">Per-block PCA: does each block have a structure?</h1>
+
+<div class="block-box">
+<strong>The screen above and this section decompose the same matrix.</strong>
+A correlation screen answers &ldquo;which <em>pairs</em> of items are
+near-duplicates?&rdquo;. It cannot answer &ldquo;does this block have a
+<em>structure</em>?&rdquo; &mdash; a block can contain no pair above
+|<em>r</em>|&nbsp;=&nbsp;0.5 and still be two clean dimensions, or be one
+dimension with a tail of weakly related items. What follows runs a principal
+component analysis on exactly the same Spearman matrix each figure above plots,
+so the two read as one argument rather than two analyses.
+<br><br>
+<strong>These components are estimated within one block at a time.</strong>
+The pooled sub-scale solution of the pilot reports ran one analysis over the
+belief and behaviour items together. C1 here is not the C1
+there, and the two numberings must never be read as interchangeable. This is a
+check on whether the blocks are sensible groupings, not a replacement for that
+solution.
+<br><br>
+<strong>Two blocks are deliberately not the same columns as the screen.</strong>
+Beliefs and Behaviour use the reverse-scored copies, so that high means
+&ldquo;more pro-liberalisation&rdquo; on every item; without that the sign of a
+loading would record how an item happened to be worded rather than what
+respondents think, and the first component would come out as a wording artefact
+instead of a dimension.
+<br><br>
+<strong>How many components each block gets</strong> is decided by parallel
+analysis (Horn, 1965) rather than by eigenvalues over 1, which is known to
+over-extract. Blocks shorter than five items are not asked the question at all:
+with three or four items there is not enough covariance structure for a second
+component to mean anything, and rotation is undefined for a single one.
+</div>
+```
+
+```{r pca-retention, echo=TRUE}
+# PCA.R is sourced in the setup chunk; its RUN_STANDALONE guard means nothing
+# ran on import. pca_block() is the same function `Rscript PCA.R` calls, so the
+# console script and this tab cannot drift apart.
+# BLOCKS_FITTED rather than BLOCKS: a block with fewer than two items has no
+# component solution, and in the pooled dataset `Behaviour` has none at all.
+pca_results <- lapply(names(BLOCKS_FITTED),
+                      function(b) pca_block(BLOCKS_FITTED[[b]], b, pilot))
+names(pca_results) <- names(BLOCKS_FITTED)
+
+knitr::kable(
+  do.call(rbind, lapply(pca_results, `[[`, "retention")),
+  row.names = FALSE,
+  caption = paste("How many components each block supports. 'Parallel' is what",
+                  "parallel analysis suggests, 'Kaiser' counts eigenvalues",
+                  "over 1 (shown for comparison only - it over-extracts), and",
+                  "'Retained' is what was actually fitted."))
+```
+
+**Read `n/item` first.** It is the thinnest part of this soft launch: a stable
+component solution wants something like 10 respondents per item, and the
+`n/item` column shows how far each block is from that. Nothing below is a result about drug
+attitudes — it is a check on whether the blocks hang together well enough to be
+worth keeping as blocks.
+
+```{r pca-blocks, echo=TRUE, results='asis', fig.height=6.2, fig.width=9.5}
+# One section per block: the diagnostics that decide whether the solution is
+# readable at all, then the loadings, then the two figures. `results='asis'`
+# so the per-block headings become real headings in the sidebar.
+for (result in pca_results) {
+  k     <- result$retention$Retained
+  items <- nrow(result$table)
+
+  cat("\n\n## ", result$block, " (", items, " items, ", k, " component",
+      if (k != 1) "s", ")\n\n", sep = "")
+
+  # The caveats that decide how much weight the solution can carry, stated
+  # rather than implied.
+  notes <- c(
+    if (result$thin)
+      paste0("**Reduced report.** Fewer than ", MIN_ITEMS_PCA, " items: one ",
+             "component, no rotation, no per-component reliability. A block ",
+             "this short cannot support a component structure, and its KMO is ",
+             "near meaningless."),
+    if (result$n_obs / items < 10)
+      paste0("**", round(result$n_obs / items, 1), " respondents per item.** ",
+             "Treat the solution as provisional."),
+    if (result$n_obs < nrow(pilot))
+      paste0("The correlation matrix is pairwise over all ", nrow(pilot),
+             " respondents; parallel analysis and reliability use the ",
+             result$n_obs, " complete cases."),
+    if (any(result$near_constant))
+      paste0("**Near-constant items:** ",
+             paste0("`", result$table$variable[result$near_constant], "` (",
+                    round(100 * result$modal_share[result$near_constant]),
+                    "% give one answer)", collapse = ", "),
+             ". Too little variance to load anywhere; consider dropping them ",
+             "before reading the solution."),
+    paste0("KMO = ", round(result$kmo$MSA, 2), " (lowest item ",
+           names(which.min(result$kmo$MSAi)), " = ",
+           round(min(result$kmo$MSAi), 2), ")",
+           if (result$kmo$MSA < 0.50) ", below 0.50 and barely factorable",
+           "; Bartlett *p* ",
+           format.pval(result$bartlett$p.value, eps = .001),
+           "; ", round(sum(result$var_pc[seq_len(k)]), 1),
+           "% of variance in ", k, " component", if (k != 1) "s",
+           " (", result$rotation, " rotation)."),
+    if (!result$thin)
+      paste0("Reliability: ",
+             paste0("C", seq_len(k), " ", result$n_members, " items, ",
+                    ifelse(is.na(result$alphas), "too few for alpha",
+                           paste0("alpha = ", round(result$alphas, 2))),
+                    collapse = "; "), ".")
+  )
+  cat(paste(notes, collapse = "\n\n"), "\n\n")
+
+  loading_table <- result$table[order(result$table$primary,
+                                      -result$table$prim_load), ]
+  # left at full length: a kable cell wraps in HTML, so truncating here only
+  # loses the end of items that share an opening clause
+  print(knitr::kable(
+    loading_table[, setdiff(names(loading_table), c("block", "prim_load"))],
+    row.names = FALSE,
+    caption = paste0(result$block, ": loadings, sorted by component. ",
+                     "'primary' is the component an item belongs to, or - if ",
+                     "its strongest loading is under ", LOAD_MIN, ".")))
+  cat("\n\n")
+
+  print(result$scree)
+  print(result$loadings_plot)
+}
+```

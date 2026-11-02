@@ -2,11 +2,13 @@
 analysis/data/
 *.sav
 analysis/**/*.csv
-# ...except aggregated results: the hand ratings and the exploratory output tables
+# ...except the hand ratings of the modality scripts (party x drug, no respondent data)
 !analysis/ratings/*.csv
-!analysis/output/**/*.csv
 # fitted model objects contain the respondent-level data they were fitted on
 *.rds
+
+# exploratory output (regenerate with the scripts in analysis/R/exploratory/)
+analysis/output/
 
 # R / RStudio
 .Rproj.user/

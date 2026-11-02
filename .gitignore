@@ -2,8 +2,10 @@
 analysis/data/
 *.sav
 analysis/**/*.csv
+# ...except the hand ratings of the modality scripts (party x drug, no respondent data)
+!analysis/ratings/*.csv
 
-# exploratory output
+# exploratory output (regenerate with the scripts in analysis/R/exploratory/)
 analysis/output/
 
 # R / RStudio
@@ -11,3 +13,20 @@ analysis/output/
 .Rhistory
 .RData
 .Ruserdata
+Rplots.pdf
+
+# LaTeX build files (the paper is compiled on Overleaf)
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+main.pdf
+
+# Office lock files
+~$*

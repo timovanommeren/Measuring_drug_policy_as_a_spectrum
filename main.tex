@@ -1,4 +1,3 @@
-% LISS panel grant 2026 proposal
 % Compile on Overleaf with pdfLaTeX (default) -- biber runs automatically.
 \documentclass[11pt,a4paper]{article}
 
@@ -22,17 +21,7 @@
 \usepackage{booktabs}
 \usepackage{array}
 
-\input{out/stats}
 
-% commands for table 1
-\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
-\newlength\wpol  \setlength\wpol{0.19\textwidth}   % policy
-\newlength\wrat  \setlength\wrat{0.17\textwidth}   % rationale
-\newlength\wtyp  \setlength\wtyp{0.11\textwidth}   % type
-\newlength\witem \setlength\witem{\dimexpr\textwidth-\wpol-\wrat-\wtyp-6\tabcolsep\relax}
-\newlength\itemheight
-\newsavebox\itembox
-\newcommand\pol[1]{\vfill #1\par\vfill}
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.6em}
@@ -80,7 +69,7 @@ For developing our attitude items, we draw on \cite{saris2004}'s typology of bas
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig_policy_scale.pdf}
+  \includegraphics[width=\linewidth]{out/fig_policy_scale.pdf}
   \caption{The nine answer options and their grouping into four regimes.}
   \label{fig:policy_scale}
 \end{figure}
@@ -178,6 +167,13 @@ Previous measurements of preference for drug regulation have found far higher su
 
 \clearpage
 \appendix
+\section{Supplementary figures and tables}
+
+\input{out/fig_gradient_grid_detailed}
+
+\input{out/tab_attitude_correlations}
+
+\input{out/fig_weights}
 
 
 \end{document}

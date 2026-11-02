@@ -30,8 +30,8 @@ knitr::opts_chunk$set(
 # so this knits and also runs chunk-by-chunk from a fresh session.
 library(here)
 
-# The data layer builds `pilot` and everything the sections in sections/ use.
-source(here("analysis", "reports", "descriptive_plots", "R", "data.R"))
+# The data layer builds `pilot` and everything the tabs use.
+source(here("analysis", "reports", "descriptive_plots", "data.R"))
 # cached chunks are keyed to the data they read
 knitr::opts_chunk$set(cache.extra = tools::md5sum(unlist(DELIVERY[c("completed", "in_progress")])))
 ```
@@ -124,8 +124,6 @@ knitr::opts_chunk$set(cache.extra = tools::md5sum(unlist(DELIVERY[c("completed",
           onclick="showTab('involvement')">Involvement &times; bimodality</button>
   <button class="tabbtn" id="tabbtn-analysis"
           onclick="showTab('analysis')">Analyses</button>
-  <button class="tabbtn" id="tabbtn-time"
-          onclick="showTab('time')">Invultijd</button>
 </div>
 ```
 
@@ -153,7 +151,7 @@ support for regulating MDMA. Read every split with the group sizes beside it.
 <div class="tabpane" id="pane-report">
 ```
 
-```{r child = 'sections/descriptives.Rmd'}
+```{r child = 'report.Rmd'}
 ```
 
 ```{=html}
@@ -164,7 +162,7 @@ support for regulating MDMA. Read every split with the group sizes beside it.
 <div class="tabpane" id="pane-involvement" style="display:none">
 ```
 
-```{r child = 'sections/involvement.Rmd'}
+```{r child = 'involvement.Rmd'}
 ```
 
 ```{=html}
@@ -175,43 +173,11 @@ support for regulating MDMA. Read every split with the group sizes beside it.
 <div class="tabpane" id="pane-analysis" style="display:none">
 ```
 
-```{r child = 'sections/policy_profiles.Rmd'}
-```
-
-```{r child = 'sections/correlations.Rmd'}
-```
-
-```{r child = 'sections/pca.Rmd'}
-```
-
-```{r child = 'sections/survey_factors.Rmd'}
-```
-
-```{r child = 'sections/linearity.Rmd'}
-```
-
-```{r child = 'sections/network.Rmd'}
-```
-
-```{r child = 'sections/linear_models.Rmd'}
-```
-
-```{r child = 'sections/references_analysis.Rmd'}
+```{r child = 'analyses.Rmd'}
 ```
 
 ```{=html}
 </div> <!-- end pane-analysis -->
-```
-
-```{=html}
-<div class="tabpane" id="pane-time" style="display:none">
-```
-
-```{r child = 'sections/time.Rmd'}
-```
-
-```{=html}
-</div> <!-- end pane-time -->
 ```
 
 
@@ -219,7 +185,7 @@ support for regulating MDMA. Read every split with the group sizes beside it.
 <script>
 /* ---- top-level tabs ---- */
 function showTab(name){
-  ['report','involvement','analysis','time'].forEach(function(t){
+  ['report','involvement','analysis'].forEach(function(t){
     document.getElementById('pane-' + t).style.display =
       (t === name) ? '' : 'none';
     document.getElementById('tabbtn-' + t).classList.toggle('active', t === name);
@@ -264,7 +230,7 @@ function showTab(name){
   }
 
   var lists = {};
-  ['report','involvement','analysis','time'].forEach(function(t){
+  ['report','involvement','analysis'].forEach(function(t){
     lists[t] = build(document.getElementById('pane-' + t));
   });
 
@@ -307,7 +273,7 @@ function showTab(name){
 
 /* ---- involvement bimodality browser ----
    Moved to involvement_browser.js and inlined by
-   sections/involvement.Rmd, which is where its data comes from. */
+   involvement.Rmd, which is where its data comes from. */
 
 </script>
 ```

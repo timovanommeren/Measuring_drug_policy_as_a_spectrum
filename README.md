@@ -98,27 +98,28 @@ compares them with automated checks (`remode`).
 ## Descriptive report
 
 `analysis/reports/descriptive_plots/descriptive_plots.Rmd` is an interactive HTML report on the main
-study: every item per demographic split, involvement × bimodality, and exploratory analyses (policy
-profiles, correlations, PCA, factor analysis, linearity, linear models, response times). Render it
-from the project root:
+study: every item per demographic split, involvement × bimodality, and within-block correlations and
+PCA. Render it from the project root:
 
 ```r
 rmarkdown::render("analysis/reports/descriptive_plots/descriptive_plots.Rmd")
 ```
 
-The HTML lands next to the Rmd and is not tracked. Structure:
+The HTML lands next to the Rmd and is not tracked. Six files, one per tab plus shared code:
 
-| Path | What it holds |
+| File | What it holds |
 |---|---|
-| `descriptive_plots.Rmd` | the report shell: setup, tabs, styling, final checks |
-| `sections/` | one child document per section, in report order |
-| `R/data.R` | reads the delivery and the QSF and builds `pilot` (one row per completed interview), the item lists and labels |
-| `R/plot_helpers.R` | generic helpers (titles, scales, slider anchors, item selection) |
-| `R/<analysis>.R` | one file per analysis section (`involvement.R`, `PCA.R`, `policy_classes.R`, ...) |
-| `js/` | the two in-browser chart viewers, inlined into the HTML |
-| `cache/` | the ReMoDe stability cache (not tracked; recomputed if missing, about a minute) |
+| `descriptive_plots.Rmd` | the report shell: setup, styling, the three tabs, final checks |
+| `report.Rmd` | tab 1, descriptive charts per item (with the code behind the counts cube) |
+| `involvement.Rmd` | tab 2, involvement × bimodality (with the ReMoDe analysis) |
+| `analyses.Rmd` | tab 3, within-block correlations and PCA per block |
+| `data.R` | reads the delivery and the QSF, builds `pilot` (one row per completed interview), plus generic helpers |
+| `browsers.js` | the two in-browser chart viewers, inlined into the HTML |
+
+Each tab's own helper code sits in hidden chunks (`include=FALSE`) inside that tab's Rmd. The knitr
+cache folder `descriptive_plots_cache/` (not tracked) also holds the ReMoDe stability cache.
 
 The sections were written for the pilot reports, so the dataset is called `pilot` and some
-variable names follow the pilots. Extra packages: `remode`, `psych` (with `GPArotation`), `mclust`,
-`jsonlite`, `svglite`, `sessioninfo`, `rmarkdown`. The involvement section includes three helper
+variable names follow the pilots. Extra packages: `remode`, `psych` (with `GPArotation`), `jsonlite`,
+`svglite`, `sessioninfo`, `rmarkdown`. The involvement section includes three helper
 functions from Hoffstadt et al. (github.com/mfhstdt/involvement_polarization, MIT).

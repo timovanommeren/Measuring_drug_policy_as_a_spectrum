@@ -3,10 +3,10 @@ library(tidyverse)
 source(here::here("analysis", "R", "00_load_and_clean.R"))
 
 # exploratory: weighted % per answer for each drug, with all categories of a demographic side by
-# side (one page per drug x demographic). Two PDFs:
-# - the four grouped regimes, with detailed demographics (many categories)
-# - the nine answer options, with coarse demographics (few categories)
-# plus the party split by involvement (grouped regimes), the full distributions per party and per drug,
+# side (one page per drug x demographic), over the nine answer options. Two PDFs:
+# - detailed demographics (many categories): policy_distributions_detailed.pdf
+# - coarse demographics (few categories): policy_distributions_coarse.pdf
+# plus the party split by involvement, the full distributions per party and per drug,
 # and the raw responses to the 18 belief items per party (beliefs_by_party.pdf)
 
 drug_labels <- c(alcohol = "Alcohol", tabak_en_vapes = "Tobacco and vapes", cannabis = "Cannabis",
@@ -17,15 +17,8 @@ option_labels <- c("Ban", "Research only", "Treatment only", "Prescription only"
                    "Specialist shop, for-profit", "Sold everywhere, no advertising",
                    "Sold everywhere, with advertising", "Free sale")
 
-# answer schemes: the four grouped regimes (regime_labels from 00_load_and_clean.R) or the nine options,
-# with the colours of figure 2
-schemes <- list(
-  regime = list(levels = str_to_sentence(regime_labels), code = \(x) cut(x, c(0, 1, 4, 6, 9), labels = FALSE),
-                colours = viridisLite::viridis(9, end = 0.9)[c(1, 3, 6, 8)],
-                note = "grouped regime: ban (1), medical/research (2–4), specialist shop (5–6), general market (7–9)"),
-  option = list(levels = option_labels, code = \(x) x, colours = viridisLite::viridis(9, end = 0.9),
-                note = "answer option (1 = ban … 9 = free sale)")
-)
+# the nine answer options, with the colours of figure 2
+option_colours <- setNames(viridisLite::viridis(9, end = 0.9), option_labels)
 
 # vote per party; small parties (n < 30, except Volt) and "Anders" together, non-voters and blank
 # together (involvement pages)
@@ -64,16 +57,16 @@ df <- df |>
 
 stopifnot(sum(as.integer(df$edu_clean) == 10) == 0, !anyNA(df$edu_7), !anyNA(df$age_7))
 
-# per scheme the demographics shown; ordinal ones keep their order, nominal ones (ordered = FALSE)
+# two sets of demographics, one PDF each; ordinal ones keep their order, nominal ones (ordered = FALSE)
 # are ordered by the share choosing a ban
 demographics <- list(
-  regime = list(
+  detailed = list(
     Sex = list(var = "sex"), Age = list(var = "age_7"), Education = list(var = "edu_7"),
     Urbanisation = list(var = "urb_5"), Province = list(var = "province", ordered = FALSE),
     `Region (Nielsen)` = list(var = "region", ordered = FALSE),
     `Vote (TK 2025, party)` = list(var = "party", ordered = FALSE)
   ),
-  option = list(
+  coarse = list(
     Sex = list(var = "sex"), Age = list(var = "age_3"), Education = list(var = "edu_3"),
     Urbanisation = list(var = "urb_3"), `Vote (TK 2025, left/right)` = list(var = "vote_2")
   )
@@ -109,12 +102,11 @@ long <- df |>
 
 stopifnot(all(long$x %in% 1:9))
 
-# weighted % per answer category in each group plus "Total" (first). `order`: the group order;
+# weighted % per answer option in each group plus "Total" (first). `order`: the group order;
 # NULL keeps the factor levels of `group_var` (ordinal) or, with `by_ban`, orders by the share choosing a ban
-answer_dist <- function(drug, group_var, scheme, data = long, order = NULL, by_ban = FALSE) {
-  s <- schemes[[scheme]]
+answer_dist <- function(drug, group_var, data = long, order = NULL, by_ban = FALSE) {
   d <- filter(data, drug == .env$drug) |>
-    mutate(answer = factor(s$levels[s$code(x)], levels = s$levels))
+    mutate(answer = factor(option_labels[x], levels = option_labels))
   d <- bind_rows(mutate(d, category = "Total"), mutate(d, category = .data[[group_var]])) |>
     filter(!is.na(category))
   shares <- d |>
@@ -123,7 +115,7 @@ answer_dist <- function(drug, group_var, scheme, data = long, order = NULL, by_b
     mutate(p = w / sum(w), n = sum(n), .by = category)
   if (is.null(order)) {
     order <- if (by_ban) {
-      shares |> filter(answer == s$levels[1]) |> arrange(p) |> pull(category)
+      shares |> filter(answer == option_labels[1]) |> arrange(p) |> pull(category)
     } else {
       levels(factor(df[[group_var]]))
     }
@@ -139,15 +131,14 @@ answer_dist <- function(drug, group_var, scheme, data = long, order = NULL, by_b
 `%|%` <- function(x, y) if (is.na(x)) y else x
 
 # `note`: the demographic's note under the title (demo_notes); "" for none
-plot_dist <- function(drug, scheme, demo, d, data = long, order = NULL, title_extra = "", order_note = NULL,
+plot_dist <- function(drug, demo, d, data = long, order = NULL, title_extra = "", order_note = NULL,
                       note = demo_notes[demo] %|% "") {
-  s <- schemes[[scheme]]
   nominal <- isFALSE(d$ordered)
-  data <- answer_dist(drug, d$var, scheme, data, order, by_ban = nominal)
+  data <- answer_dist(drug, d$var, data, order, by_ban = nominal)
   n_groups <- n_distinct(data$category)
   # fewer, larger labels when the bars are narrow
-  label_min <- if (scheme == "option") 0.02 else 0.01
-  label_size <- if (n_groups > 10) 2.3 else if (scheme == "option") 2.7 else 3
+  label_min <- 0.02
+  label_size <- if (n_groups > 10) 2.3 else 2.7
   if (is.null(order_note)) {
     order_note <- if (nominal) "Groups ordered by the share choosing a ban, lowest first." else ""
   }
@@ -155,13 +146,13 @@ plot_dist <- function(drug, scheme, demo, d, data = long, order = NULL, title_ex
     geom_col(position = position_dodge(width = 0.88), width = 0.84) +
     geom_text(aes(label = if_else(p >= label_min, as.character(round(100 * p)), "")),
               position = position_dodge(width = 0.88), vjust = -0.4, size = label_size) +
-    scale_fill_manual(values = setNames(s$colours, s$levels)) +
+    scale_fill_manual(values = option_colours) +
     scale_y_continuous(labels = scales::label_percent(), limits = c(0, max(data$p) + 0.06),
                        expand = expansion(0)) +
-    guides(fill = guide_legend(nrow = if (scheme == "option") 2 else 1, byrow = TRUE)) +
+    guides(fill = guide_legend(nrow = 2, byrow = TRUE)) +
     labs(title = sprintf("%s by %s%s", drug_labels[[drug]],
                          paste0(str_to_lower(str_sub(demo, 1, 1)), str_sub(demo, 2)), title_extra),
-         subtitle = str_wrap(str_squish(paste0("Weighted % per ", s$note, "; numbers above the bars in %; no opinion ",
+         subtitle = str_wrap(str_squish(paste0("Weighted % per answer option (1 = ban … 9 = free sale); numbers above the bars in %; no opinion ",
                                                "excluded. ", order_note, " ", note)),
                              width = 175),
          x = NULL, y = "Respondents (weighted %)", fill = NULL) +
@@ -175,22 +166,21 @@ plot_dist <- function(drug, scheme, demo, d, data = long, order = NULL, title_ex
 }
 
 # each group sums to 100%
-for (scheme in names(schemes)) for (d in demographics[[scheme]]) {
-  stopifnot(all(abs(summarise(answer_dist("mdma", d$var, scheme), s = sum(p), .by = category)$s - 1) < 1e-9))
+for (d in list_flatten(demographics)) {
+  stopifnot(all(abs(summarise(answer_dist("mdma", d$var), s = sum(p), .by = category)$s - 1) < 1e-9))
 }
 
 out_dir <- here::here("analysis", "output", "raw_distributions")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-files <- c(regime = "policy_distributions_regimes.pdf", option = "policy_distributions_options.pdf")
-for (scheme in names(schemes)) {
-  cairo_pdf(file.path(out_dir, files[[scheme]]), width = 11, height = 7, onefile = TRUE)
-  iwalk(demographics[[scheme]], \(d, demo) walk(names(drug_labels), \(drug) print(plot_dist(drug, scheme, demo, d))))
+for (set in names(demographics)) {
+  cairo_pdf(file.path(out_dir, sprintf("policy_distributions_%s.pdf", set)), width = 11, height = 7, onefile = TRUE)
+  iwalk(demographics[[set]], \(d, demo) walk(names(drug_labels), \(drug) print(plot_dist(drug, demo, d))))
   dev.off()
 }
 
 
-## Party split by involvement: per drug, the bottom half and then the top half (grouped regimes)
+## Party split by involvement: per drug, the bottom half and then the top half
 
 vote_grouped <- list(var = "vote", ordered = FALSE)
 half_titles <- c(bottom = sprintf(" — involvement bottom half (≤ %s)", inv_median),
@@ -198,10 +188,10 @@ half_titles <- c(bottom = sprintf(" — involvement bottom half (≤ %s)", inv_m
 
 involvement_pages <- map(names(drug_labels), \(drug) {
   # same party order on both pages: the full-sample order
-  order <- answer_dist(drug, "vote", "regime", by_ban = TRUE) |> distinct(category, label) |> arrange(label) |>
+  order <- answer_dist(drug, "vote", by_ban = TRUE) |> distinct(category, label) |> arrange(label) |>
     pull(category)
   map(c("bottom", "top"), \(half) {
-    plot_dist(drug, "regime", "Vote (TK 2025, party)", vote_grouped, data = filter(long, involvement == half),
+    plot_dist(drug, "Vote (TK 2025, party)", vote_grouped, data = filter(long, involvement == half),
               order = order, title_extra = half_titles[[half]], note = "",
               order_note = paste("Involvement: “Hoe een partij omgaat met drugs en drugscriminaliteit, weegt mee",
                                  "bij mijn stemkeuze” (0–100), split at the weighted median. Parties in the",

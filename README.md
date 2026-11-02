@@ -68,8 +68,6 @@ The repository is public, so the survey data are **never committed** (`.gitignor
 Conventions used throughout (set in `00_load_and_clean.R`):
 
 - `beleid_voorkeur_<drug>`: preferred policy, 1 = ban … 9 = free sale; 99 ("geen mening") is set to `NA`.
-- `regime_<drug>`: the nine options grouped into four regimes: ban (1), medical/research (2–4),
-  specialist shop (5–6), general market (7–9).
 - `w`: the analysis weight, Kieskompas's iterative post-stratification weight trimmed at the 99th
   percentile (`weight_trimmed_0990`); `des` is the matching `survey` design.
 
@@ -81,7 +79,6 @@ Conventions used throughout (set in `00_load_and_clean.R`):
 | Script | What it does | Extra packages |
 |---|---|---|
 | `raw_distributions.R` | Raw answer distributions per drug × demographic, per party, by involvement, and the belief items per party | |
-| `results_table.R` | Table of regime shares per demographic group (numeric companion of Figure 3) | |
 | `party_map_variants.R` | Variants of the party map: other drug pairs, medians, modes, support for the middle options | |
 | `factor_model.R` | Ordinal factor models: does a licit factor separate from an illicit factor at the respondent level? | `lavaan`, `semPlot` |
 | `latent/lca.R`, `latent/lpa_profiles.R` | Latent class and latent profile analyses of the policy preferences | `poLCA`, `tidyLPA`, `mclust` |

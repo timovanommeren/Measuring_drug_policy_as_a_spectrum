@@ -106,13 +106,13 @@ measures <- list(
                        splits = groups, same_axes = FALSE, quadrants = FALSE,
                        title = "support for the middle options", axis = "Support for the middle options",
                        scale = " (weighted %)", ref_note = "mean of all respondents",
-                       method = paste("Per respondent the share of answers in medical/research (2–4) or specialist shop (5–6)",
+                       method = paste("Per respondent the share of answers in options 2–6 (research only … specialist shop, for-profit)",
                                       "over the drugs answered, then the weighted mean per party.")),
   middle = list(stat = "mean", value = \(x) as.numeric(x %in% 2:6), file = "party_map_illicit_vs_legal_middle.pdf",
                 percent = TRUE, splits = splits, same_axes = TRUE, quadrants = FALSE,
                 title = "support for the middle options", axis = "Support for the middle options",
                 scale = " (weighted %)", ref_note = "mean of all respondents",
-                method = paste("Per respondent the share of answers in medical/research (2–4) or specialist shop (5–6)",
+                method = paste("Per respondent the share of answers in options 2–6 (research only … specialist shop, for-profit)",
                                "over the drugs answered, then the weighted mean per party."))
 )
 

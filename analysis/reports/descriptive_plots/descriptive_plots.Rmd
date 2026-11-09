@@ -30,10 +30,9 @@ knitr::opts_chunk$set(
 # so this knits and also runs chunk-by-chunk from a fresh session.
 library(here)
 
-# The data layer builds `pilot` and everything the tabs use.
-source(here("analysis", "reports", "descriptive_plots", "data.R"))
-# cached chunks are keyed to the data they read
-knitr::opts_chunk$set(cache.extra = tools::md5sum(unlist(DELIVERY[c("completed", "in_progress")])))
+# `df`: all cleaning and derived variables, shared with the rest of the repository
+source(here("analysis", "R", "00_load_and_clean.R"))
+source(here("analysis", "R", "utils", "report_helpers.R"))
 ```
 
 
@@ -130,16 +129,15 @@ knitr::opts_chunk$set(cache.extra = tools::md5sum(unlist(DELIVERY[c("completed",
 ```{=html}
 <div class="block-box" style="margin-top:0">
 <strong>This report describes the main study: the full main study, delivered 22 October 2026.</strong>
-The completed interviews are analysed, with the same charts, tables and splits
-as the pilot report. The full delivery also carries survey weights; nothing in
-this report is weighted.
+The completed interviews that carry a survey weight are analysed, with the same
+charts, tables and splits as the pilot report. <strong>Everything is weighted</strong>
+with the trimmed survey weight, unless a chart or table says otherwise.
 <br><br>
 <strong>What changed from the pilots.</strong> The main study has 18 belief
 statements in four blocks, three behaviour items, nine policy rules instead of
 seven, own use for four substance groups instead of nine substances, an emotion
 question about six topics without <em>hoop</em>, and five involvement sliders.
-The demographics are the agency's recodes; only age carries labels, because only
-age can be checked against the QSF.
+The demographics are the agency's recodes, labelled by the agency.
 <br><br>
 <strong>Read the split buttons with the group sizes.</strong> Every descriptive
 chart can be broken down by the agency's demographics, by substance use and by
@@ -279,31 +277,25 @@ function showTab(name){
 ```
 
 ```{r dataset-checks, echo=TRUE}
-# Invariants of the analysis dataset. These are cheap and they fail the knit
-# loudly, which is what you want if new data or a reworded question ever
-# breaks an assumption the rest of the report is built on.
+# Invariants of the analysis dataset. Cheap, and they fail the knit loudly if new
+# data ever breaks an assumption the report is built on.
+anti <- intersect(anti_items, names(df))
+pro  <- setdiff(c(select_items("beliefs"), select_items("gedrag")), anti)
 stopifnot(
-  # one row per analysed respondent, no duplicates
-  nrow(pilot) == n_pilot,
-  !anyDuplicated(pilot$ResponseId),
-  # every item block is present and complete
-  all(item_meta$variable %in% names(pilot)),
-  all(paste0(item_meta$variable, "_scored") %in% names(pilot)),
-  all(POLICY_COLUMNS %in% names(pilot)),
-  length(select_items("betrokkenheid",   names(pilot))) == 5L,
-  length(subst_cols) == 4L,
-  # reverse-scoring is its own inverse on the flipped items, and a no-op elsewhere
-  all.equal(pilot[[reverse_cols[1]]],
-            (SCALE_MIN + SCALE_MAX) - pilot[[paste0(reverse_cols[1], "_scored")]]),
-    # an item the pool calls "Pro" is not flipped: its _scored copy is the raw
-  # answer. Taken from item_meta rather than named, because the two pilots do
-  # not share item names.
-  identical(pilot[[item_meta$variable[item_meta$reverse_coded == "no"][1]]],
-            pilot[[paste0(item_meta$variable[item_meta$reverse_coded == "no"][1],
-                          "_scored")]])
+  # one row per analysed respondent, no duplicates, everyone weighted
+  !anyDuplicated(df$InterviewId), !anyNA(df$w),
+  # every item block is present
+  length(select_items("beliefs")) == 18L, length(select_items("gedrag")) == 3L,
+  length(grep("^beleid_voorkeur_", names(df))) == 9L, length(select_items("betrokkenheid")) == 5L,
+  length(select_items("gebruik")) == 4L,
+  # "geen mening" is missing on every item
+  !any(unlist(df[c(select_items("beliefs"), select_items("gedrag"),
+                   grep("^beleid_voorkeur_", names(df), value = TRUE))]) == 99, na.rm = TRUE),
+  # the _scored copies reverse the anti items and copy the others
+  all(vapply(anti, \(v) isTRUE(all.equal(df[[paste0(v, "_scored")]], 8 - as.numeric(df[[v]]))), logical(1))),
+  all(vapply(pro, \(v) identical(df[[paste0(v, "_scored")]], as.numeric(df[[v]])), logical(1)))
 )
-cat("`pilot`:", nrow(pilot), "respondents x", ncol(pilot),
-    "columns - all checks passed.\n")
+cat("`df`:", nrow(df), "respondents x", ncol(df), "columns - all checks passed.\n")
 ```
 
 # Reproducibility

@@ -290,7 +290,7 @@ local({
   # as weighted % per answer (one PDF, one page per item)
 
   # item wording from the variable labels
-  item_labels <- grep("^beliefs_", names(df), value = TRUE) |>
+  item_labels <- grep("^beliefs_[a-z]+_[0-9]+$", names(df), value = TRUE) |>
     set_names() |>
     map_chr(\(v) attr(df[[v]], "label"))
 
@@ -312,12 +312,12 @@ local({
                      "Enigszins mee eens", "Mee eens", "Helemaal mee eens", "Geen mening")
   answer_colours <- setNames(c(RColorBrewer::brewer.pal(7, "RdBu"), "grey75"), answer_labels)
 
-  # one row per respondent x item with an answer, geen mening (99) included
+  # one row per respondent x item, geen mening included: NA in df (code 99 in the export), the only
+  # missing value these items have
   long <- df |>
     select(w, vote, all_of(names(item_labels))) |>
     pivot_longer(all_of(names(item_labels)), names_to = "item", values_to = "x") |>
-    filter(!is.na(x)) |>
-    mutate(x = as.numeric(x),
+    mutate(x = replace_na(as.numeric(x), 99),
            answer = factor(match(x, c(1:7, 99)), levels = 1:8, labels = answer_labels))
 
   stopifnot(!anyNA(long$answer))

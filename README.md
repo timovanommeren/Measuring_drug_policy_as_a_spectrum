@@ -21,7 +21,8 @@ analysis/
     03_fig_party_map.R         Figure 4a (party map)
     A1_weights.R               Appendix: weighting diagnostics
     A2_attitudes.R             Appendix: correlations between policy and the attitude items
-    utils/                     helpers sourced by other scripts (party logos, party-map scores)
+    utils/                     helpers sourced by other scripts (party logos, party-map scores,
+                               the descriptive report's helpers)
     exploratory/               analyses that are not (yet) in the paper, see below
   reports/
     descriptive_plots/         descriptive report of the main study (item checks, involvement,
@@ -58,7 +59,7 @@ commit the changed files in `out/` and Overleaf picks them up.
 1. Put the data files in `analysis/data/` (see below).
 2. Open `drug_policy_spectrum.Rproj` and run `01`–`03`, `A1` and `A2` (in any order).
 
-Packages for the paper: `tidyverse`, `haven`, `here`, `survey`, `patchwork`, `png`, `rsvg`, `colorspace`,
+Packages for the paper: `tidyverse`, `haven`, `readxl`, `here`, `survey`, `patchwork`, `png`, `rsvg`, `colorspace`,
 `viridisLite`, `scales`, `RColorBrewer`, `knitr` and `sf` (the COROP map in `A1_weights.R`; it downloads
 the CBS boundaries to `analysis/data/coropgebied.geojson` if missing).
 
@@ -67,14 +68,25 @@ the CBS boundaries to `analysis/data/coropgebied.geojson` if missing).
 The repository is public, so the survey data are **never committed** (`.gitignore` excludes
 `analysis/data/`, `*.sav`, `*.rds` (fitted models contain the data) and csv files under `analysis/`
 other than the hand ratings in `analysis/ratings/`). Ask Timo van Ommeren for
-`NLOZ26-10_Drugsbeleid_gedeeld_261022.sav` (the paper scripts), and for the descriptive report also
-`NLOZ26-10_Drugsbeleid_gedeeld_261022.csv` and `NLOZ26-10_Drugsbeleid_in progress_gedeeld_261022.csv`. The variable codebook is in `analysis/assets/`.
+`NLOZ26-10_Drugsbeleid_gedeeld_261022.sav`; the paper scripts and the descriptive report both read only
+this file. The variable codebook is in `analysis/assets/`.
 
-Conventions used throughout (set in `00_load_and_clean.R`):
+Conventions used throughout (set in `00_load_and_clean.R`, the only place where data are cleaned or
+variables derived, for the paper, the exploratory scripts and the descriptive report alike):
 
-- `beleid_voorkeur_<drug>`: preferred policy, 1 = ban … 9 = free sale; 99 ("geen mening") is set to `NA`.
+- `df`: the completed interviews that carry a survey weight (n = 1239), with the export's variable
+  names and codes (`beleid_voorkeur_<drug>` 1 = ban … 9 = free sale; `gebruik_1–4` 1 = never … 4 = often).
+- 99 ("geen mening") is set to NA on every item; on the 0–100 involvement sliders (`betrokkenheid_*`)
+  99 is a position and is kept.
+- Question wording: the `.sav` variable labels. Answer labels: the agency's codebook
+  (`analysis/assets/`), put on the columns, so `haven::as_factor()` uses them.
+- Derived variables: `<item>_scored` (belief and behaviour items reversed where agreeing favours
+  prohibition, so high = liberal), `betrokkenheid_mean`, `substance_ladder`, `mdma_support`, the emotion
+  binaries `emo_<topic>_<feeling>` and their combination per topic `emo_<topic>`, `vote_lr`, `vote_3`, and
+  the groupings of Figure 3, `age_group`, `edu_group` and `urb_group` (also the report's split buttons).
 - `w`: the analysis weight, Kieskompas's iterative post-stratification weight trimmed at the 99th
-  percentile (`weight_trimmed_0990`); `des` is the matching `survey` design.
+  percentile (`weight_trimmed_0990`); `des` is the matching `survey` design. Everything is weighted;
+  anything unweighted says so.
 
 ## Exploratory analyses
 
@@ -105,21 +117,20 @@ PCA. Render it from the project root:
 rmarkdown::render("analysis/reports/descriptive_plots/descriptive_plots.Rmd")
 ```
 
-The HTML lands next to the Rmd and is not tracked. Six files, one per tab plus shared code:
+The HTML lands next to the Rmd and is not tracked. It reads `df` from `analysis/R/00_load_and_clean.R`
+and its helper functions from `analysis/R/utils/report_helpers.R`, and is weighted throughout:
+counts are weighted counts and every *n* beside them is the unweighted number of respondents.
 
 | File | What it holds |
 |---|---|
 | `descriptive_plots.Rmd` | the report shell: setup, styling, the three tabs, final checks |
 | `report.Rmd` | tab 1, descriptive charts per item (with the code behind the counts cube) |
-| `involvement.Rmd` | tab 2, involvement × bimodality (with the ReMoDe analysis) |
-| `analyses.Rmd` | tab 3, within-block correlations and PCA per block |
-| `data.R` | reads the delivery and the QSF, builds `pilot` (one row per completed interview), plus generic helpers |
+| `involvement.Rmd` | tab 2, involvement × bimodality (ReMoDe on weighted counts rounded to whole respondents) |
+| `analyses.Rmd` | tab 3, weighted within-block correlations and PCA per block |
 | `browsers.js` | the two in-browser chart viewers, inlined into the HTML |
 
-Each tab's own helper code sits in hidden chunks (`include=FALSE`) inside that tab's Rmd. The knitr
-cache folder `descriptive_plots_cache/` (not tracked) also holds the ReMoDe stability cache.
+Each tab's own analysis code sits in hidden chunks (`include=FALSE`) inside that tab's Rmd. The knitr
+cache folder `descriptive_plots_cache/` (not tracked) also holds the ReMoDe stability cache. Extra
+packages: `remode`, `psych` (with `GPArotation`), `jsonlite`, `svglite`, `sessioninfo`, `rmarkdown`,
+`readxl`.
 
-The sections were written for the pilot reports, so the dataset is called `pilot` and some
-variable names follow the pilots. Extra packages: `remode`, `psych` (with `GPArotation`), `jsonlite`,
-`svglite`, `sessioninfo`, `rmarkdown`. The involvement section includes three helper
-functions from Hoffstadt et al. (github.com/mfhstdt/involvement_polarization, MIT).

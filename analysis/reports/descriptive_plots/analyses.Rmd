@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
 # A principal component analysis per block of the survey (sections/pca.Rmd),
 # complementing the within-block correlation matrices (sections/correlations.Rmd).
 # The correlation screen shows which PAIRS of items are near-duplicates; this
-# shows whether a block has a STRUCTURE, decomposing the same Spearman matrix.
+# shows whether a block has a STRUCTURE, decomposing the same weighted Spearman matrix.
 #
 # Components are estimated within one block at a time, so C1 of one block has
 # nothing to do with C1 of another. pca_block() computes one block and returns
@@ -42,16 +42,15 @@ BLOCK_NAMES <- c("Beliefs", "Behaviour", "Substance use",
                  "Policy preference", "Involvement")
 BLOCKS <- setNames(
   list(
-    scored_copies(select_items("beliefs", names(pilot))),
-    scored_copies(select_items("gedrag_beleid", names(pilot))),
-    subst_cols,                       # own use per substance group (four items)
-    unname(POLICY_COLUMNS),
-    select_items("betrokkenheid", names(pilot))
+    scored_copies(select_items("beliefs")),
+    scored_copies(select_items("gedrag")),
+    select_items("gebruik"),                          # own use per substance group (four items)
+    grep("^beleid_voorkeur_", names(df), value = TRUE),
+    select_items("betrokkenheid")
   ),
   BLOCK_NAMES
 )
-BLOCKS <- lapply(BLOCKS, intersect, ANALYSIS_COLUMNS)
-stopifnot(all(unlist(BLOCKS) %in% names(pilot)))
+stopifnot(all(unlist(BLOCKS) %in% names(df)))
 
 # a component needs at least a pair of items
 BLOCKS_FITTED <- Filter(function(cols) length(cols) >= 2L, BLOCKS)
@@ -68,9 +67,10 @@ stopifnot(length(BLOCKS_FITTED) > 0)
 # simulates data, so a block's retention count must not depend on how many
 # blocks happened to be fitted before it.
 # -----------------------------------------------------------------------------
-pca_block <- function(cols, block_name, pilot) {
+pca_block <- function(cols, block_name, data = df) {
   set.seed(SEED)
-  x <- as.matrix(pilot[cols])
+  x <- as.matrix(mutate(data[cols], across(everything(), as.numeric)))
+  w <- data$w
 
   # An item with NO variance at all has no correlations either: its row and
   # column of R come back NA, and eigen() then refuses the entire matrix rather
@@ -92,18 +92,10 @@ pca_block <- function(cols, block_name, pilot) {
 
   k_items <- ncol(x)
 
-  # The correlation matrix, from the SAME call the correlation screen makes -
-  # not a re-derivation. Everything downstream (principal, KMO, Bartlett) reads
-  # a correlation matrix, so this is the only place the data enter the model.
-  R <- cor(x, use = "pairwise.complete.obs", method = METHOD)
-
-  # Parallel analysis is the exception: it needs raw data, not a matrix, and
-  # psych::fa.parallel() has no method = "spearman". Spearman IS Pearson on the
-  # ranks, so ranking first gives it the same matrix rather than silently
-  # switching the whole retention decision to Pearson. na.last = "keep"
-  # matters: rank()'s default would hand the "Geen mening" cells a real rank.
+  # The weighted correlation matrix, from the SAME call the correlation screen makes. Everything downstream
+  # (parallel analysis, principal, KMO, Bartlett) reads this matrix with n_obs, so the weights enter here.
+  R <- w_cor(x, w, METHOD)
   complete <- complete.cases(x)
-  ranked   <- apply(x[complete, , drop = FALSE], 2, rank, na.last = "keep")
 
   n_obs  <- sum(complete)
   eig    <- eigen(R, only.values = TRUE)$values
@@ -117,8 +109,8 @@ pca_block <- function(cols, block_name, pilot) {
   # deviation - a resample can easily draw only the modal answer - which is why
   # that call is wrapped below rather than left to emit dozens of warnings.
   modal_share <- apply(x, 2, function(v) {
-    v <- v[!is.na(v)]
-    max(table(v)) / length(v)
+    ok <- !is.na(v)
+    max(tapply(w[ok], v[ok], sum)) / sum(w[ok])
   })
 
   # ---- how many components? --------------------------------------------------
@@ -133,7 +125,7 @@ pca_block <- function(cols, block_name, pilot) {
     # fa.parallel() cat()s its own one-line verdict even with plot = FALSE;
     # swallowed here so the caller is the single reporter of it.
     invisible(capture.output(suppressWarnings(
-      pa <- psych::fa.parallel(ranked, fa = "pc", n.iter = N_ITER_PA,
+      pa <- psych::fa.parallel(R, n.obs = n_obs, fa = "pc", n.iter = N_ITER_PA,
                                plot = FALSE)
     )))
     k_pa <- pa$ncomp
@@ -152,11 +144,8 @@ pca_block <- function(cols, block_name, pilot) {
   prim_load <- apply(abs(loads), 1, max)
   assigned  <- prim_load >= LOAD_MIN
 
-  # `wording` is keyed by the RAW variable name, so the _scored suffix has to
-  # come off before the lookup - reverse-scoring does not change the question.
-  text_full <- sub("^.*? - ", "",
-                   gsub("[\r\n]+", " ", wording[sub("_scored$", "", cols)]))
-  text_full[is.na(text_full)] <- cols[is.na(text_full)]
+  # wording of the raw item: reverse-scoring does not change the question
+  text_full <- item_titles(sub("_scored$", "", cols), data)
 
   # Two shapes of the same result. The WIDE table is what reads well in a
   # console and in a knitr::kable(), one row per item; but its columns depend
@@ -195,8 +184,9 @@ pca_block <- function(cols, block_name, pilot) {
   alphas <- vapply(seq_len(k), function(ci) {
     members <- cols[assigned & primary == ci]
     if (thin || length(members) < 3) return(NA_real_)
-    a <- suppressMessages(suppressWarnings(
-      psych::alpha(pilot[complete, members], warnings = FALSE)))
+    # from the weighted covariance matrix of the complete cases
+    cv <- stats::cov.wt(x[complete, match(members, cols), drop = FALSE], wt = w[complete])$cov
+    a <- suppressMessages(suppressWarnings(psych::alpha(cv, warnings = FALSE)))
     a$total$raw_alpha
   }, numeric(1))
   n_members <- vapply(seq_len(k),
@@ -335,15 +325,16 @@ that paper's reporting standards in mind:
     categories, missing-data handling), the estimator and its settings, software
     versions and the random seed &mdash; so the eventual network is reproducible.</li>
 </ul>
-The table(s) below list, per block, the item pairs whose Spearman
-correlation exceeds the threshold. The code is intentionally plain base R so you
+The table(s) below list, per block, the item pairs whose <strong>weighted</strong>
+Spearman correlation (the weighted Pearson correlation of the ranks) exceeds the
+threshold. The code is intentionally plain base R so you
 can read and edit it (change <code>blocks</code>, <code>threshold</code>, or
 <code>method</code>).
 </div>
 ```
 
 ```{r analysis-correlations, echo=TRUE, results='asis', message=FALSE, warning=FALSE, fig.height=6.2, fig.width=9.5}
-# ---- Within-block correlation matrices: a pilot redundancy screen -----------
+# ---- Within-block correlation matrices: a redundancy screen ------------------
 # One matrix per block of items. Spearman correlations (the items are ordinal);
 # the colour runs blue (negative) - white (zero) - red (positive), so a strongly
 # red off-diagonal cell is a candidate for redundancy: near-duplicate items
@@ -359,25 +350,19 @@ can read and edit it (change <code>blocks</code>, <code>threshold</code>, or
 # Resolved before the block list so the columns and their labels are subset
 # together; emotion_item_labels() returns one label per column of
 # emotion_item_columns(), in the same order, so they are paired by name first.
-emotion_all     <- emotion_item_columns()
-emotion_label   <- setNames(emotion_item_labels(emotion_cols, wording), emotion_all)
-emotion_columns <- intersect(emotion_all, names(pilot))
+# the emotion items: topic x feeling binaries without "none", topic-major
+emo_lab         <- emotion_labels()
+emotion_columns <- as.vector(t(outer(paste0("emo_", emo_topics, "_"), setdiff(emo_feelings, "none"), paste0)))
+emotion_label   <- as.vector(t(outer(emo_lab$topic, tolower(emo_lab$feeling[setdiff(emo_feelings, "none")]),
+                                     paste, sep = " - ")))
 
 blocks <- setNames(
   list(
-    select_items("beliefs",       names(pilot)),
-    select_items("gedrag_beleid", names(pilot)),
-    subst_cols,
-    unname(POLICY_COLUMNS),
-    select_items("betrokkenheid", names(pilot)),
-    # The emotion question, as topic x emotion binaries ordered topic-major.
-    # emotion_item_columns() (R/data.R) builds it from EMOTION_TOPICS and
-    # EMOTION_TYPES: 6 topics x 3 emotions.
-    #
-    # In the POOLED dataset the product is ragged: pilot 1 offered `hoop` and
-    # pilot 2 did not, pilot 2 added two topics pilot 1 never asked, so
-    # `emo_wod_hoop` is a combination neither instrument put to anyone. Only the
-    # columns that exist are kept, and their labels are subset to match.
+    select_items("beliefs"),
+    select_items("gedrag"),
+    select_items("gebruik"),
+    grep("^beleid_voorkeur_", names(df), value = TRUE),
+    select_items("betrokkenheid"),
     emotion_columns
   ),
   c(BLOCK_NAMES, "Emoties")
@@ -388,9 +373,7 @@ method    <- "spearman"   # ordinal-appropriate; use "pearson" if you prefer
 # ---- Three things the emotion block needs and the other five do not ---------
 # It is the only block of BINARY items, and that changes what the screen means.
 #
-# 1. LABELS. `wording` is keyed by the EXPORT columns, which for this question
-#    are the topic columns Q28_*; the binaries are derived and have no entry, so
-#    every row label would come out NA. They are composed instead.
+# 1. LABELS. Composed as "topic - feeling" from the .sav labels.
 # 2. THRESHOLD. cor() on 0/1 is the phi coefficient, which is capped by the two
 #    base rates - see the note printed with the matrix. At these base rates a
 #    large share of the pairs cannot reach 0.5 at all, so screening this block at
@@ -400,16 +383,14 @@ method    <- "spearman"   # ordinal-appropriate; use "pearson" if you prefer
 #
 # All three are per-block lookups with a default, so the five existing blocks
 # are untouched.
-block_labels <- list(
-  Emoties = unname(emotion_label[emotion_columns]))
+block_labels <- list(Emoties = emotion_label)
 block_threshold <- c(Emoties = 0.3)
 # Separators wherever the topic changes, counted from the columns actually
 # present rather than assuming every topic contributes the same number - which
 # it does not in the pooled dataset.
 block_breaks <- list(
   Emoties = local({
-    topic <- sub("_(?:boos|bang_bezorgd|hoop|blij|geen_van_deze)$", "",
-                 emotion_columns)
+    topic <- sub("_(angry|worried|happy)$", "", emotion_columns)
     head(cumsum(rle(topic)$lengths), -1)
   }))
 
@@ -417,11 +398,11 @@ for (block_name in names(blocks)) {
   cols <- blocks[[block_name]]
   if (length(cols) < 2) next
 
-  item_matrix <- as.matrix(pilot[cols])
+  item_matrix <- as.matrix(mutate(df[cols], across(everything(), as.numeric)))
   # items are numbered by their position in the block, which is survey order
   numbers   <- as.character(seq_along(cols))
   full_text <- if (is.null(block_labels[[block_name]]))
-    sub("^.*? - ", "", gsub("[\r\n]+", " ", wording[cols])) else
+    item_titles(cols) else
     block_labels[[block_name]]
   block_r   <- if (is.na(block_threshold[block_name]))
     threshold else unname(block_threshold[block_name])
@@ -435,7 +416,7 @@ for (block_name in names(blocks)) {
   row_labels <- paste0(numbers, ". ", full_text)
   colnames(item_matrix) <- numbers
 
-  R <- cor(item_matrix, use = "pairwise.complete.obs", method = method)
+  R <- w_cor(item_matrix, df$w, method)
 
   # long format for a tile plot; keep the lower triangle plus the diagonal
   long <- expand.grid(row = numbers, col = numbers, stringsAsFactors = FALSE)
@@ -455,7 +436,7 @@ for (block_name in names(blocks)) {
   # rather than asserted: how many of its pairs the usual 0.5 screen could not
   # have flagged whatever the respondents answered.
   if (block_name == "Emoties") {
-    rates <- colMeans(item_matrix, na.rm = TRUE)
+    rates <- apply(item_matrix, 2, w_mean, w = df$w)
     ceiling <- outer(rates, rates, phi_max)
     unreachable <- sum(ceiling[upper.tri(ceiling)] < threshold)
     cat("These items are binary, so this is the **phi** coefficient",
@@ -527,12 +508,7 @@ that block explains, a threshold most of those pairs cannot reach.
 block_letter <- c("Beliefs" = "B", "Behaviour" = "G", "Substance use" = "S",
                   "Policy preference" = "P", "Involvement" = "I")
 
-# An EMPTY block is dropped from this matrix. The pooled dataset has no gedrag
-# items - pilot 1's four were replaced by three new ones, so none is common to
-# both pilots - and `paste0("G", integer(0))` is "G", not character(0), because
-# paste0 treats a zero-length argument as "". That stray label made the label
-# vector one longer than the matrix, and the failure surfaced as a dimnames
-# length error with nothing pointing at the empty block.
+# an empty block is dropped from this matrix
 block_letter <- block_letter[lengths(blocks[names(block_letter)]) > 0]
 
 all_cols   <- unlist(unname(blocks[names(block_letter)]))
@@ -540,9 +516,10 @@ all_labels <- unlist(lapply(names(block_letter), function(b)
   paste0(block_letter[[b]], seq_along(blocks[[b]]))))
 stopifnot(length(all_cols) == length(all_labels))
 
-all_matrix <- as.matrix(pilot[all_cols])
+all_matrix <- as.matrix(mutate(df[all_cols], across(everything(), as.numeric)))
 colnames(all_matrix) <- all_labels
-R_all <- cor(all_matrix, use = "pairwise.complete.obs", method = method)
+all_titles <- unlist(lapply(names(block_letter), \(b) item_titles(blocks[[b]])))
+R_all <- w_cor(all_matrix, df$w, method)
 
 long_all <- expand.grid(row = all_labels, col = all_labels, stringsAsFactors = FALSE)
 long_all$r <- as.vector(R_all)
@@ -599,7 +576,7 @@ if (nrow(cross) == 0) {
 } else {
   label_of <- function(code) {
     v <- all_cols[match(code, all_labels)]      # axis code -> column name
-    paste0(code, ". ", cap_text(sub("^.*? - ", "", gsub("[\r\n]+", " ", wording[[v]])), 55))
+    paste0(code, ". ", cap_text(all_titles[match(code, all_labels)], 55))
   }
   knitr::kable(data.frame(
     item_1 = vapply(cross$code_row, label_of, character(1)),
@@ -627,7 +604,7 @@ near-duplicates?&rdquo;. It cannot answer &ldquo;does this block have a
 <em>structure</em>?&rdquo; &mdash; a block can contain no pair above
 |<em>r</em>|&nbsp;=&nbsp;0.5 and still be two clean dimensions, or be one
 dimension with a tail of weakly related items. What follows runs a principal
-component analysis on exactly the same Spearman matrix each figure above plots,
+component analysis on exactly the same weighted Spearman matrix each figure above plots,
 so the two read as one argument rather than two analyses.
 <br><br>
 <strong>These components are estimated within one block at a time.</strong>
@@ -659,7 +636,7 @@ component to mean anything, and rotation is undefined for a single one.
 # BLOCKS_FITTED rather than BLOCKS: a block with fewer than two items has no
 # component solution, and in the pooled dataset `Behaviour` has none at all.
 pca_results <- lapply(names(BLOCKS_FITTED),
-                      function(b) pca_block(BLOCKS_FITTED[[b]], b, pilot))
+                      function(b) pca_block(BLOCKS_FITTED[[b]], b))
 names(pca_results) <- names(BLOCKS_FITTED)
 
 knitr::kable(
@@ -699,8 +676,8 @@ for (result in pca_results) {
     if (result$n_obs / items < 10)
       paste0("**", round(result$n_obs / items, 1), " respondents per item.** ",
              "Treat the solution as provisional."),
-    if (result$n_obs < nrow(pilot))
-      paste0("The correlation matrix is pairwise over all ", nrow(pilot),
+    if (result$n_obs < nrow(df))
+      paste0("The correlation matrix is pairwise over all ", nrow(df),
              " respondents; parallel analysis and reliability use the ",
              result$n_obs, " complete cases."),
     if (any(result$near_constant))

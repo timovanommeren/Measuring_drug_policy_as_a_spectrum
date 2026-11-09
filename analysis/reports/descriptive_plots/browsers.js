@@ -41,8 +41,7 @@
   var PALETTE = {
     politics: ['#3B6EA5', '#8E7CC3', '#B22222'],           // links / midden / rechts
     gender:   ['#3B6EA5', '#D9822B'],                       // Man / Vrouw
-    age:      ['#DCE6F1', '#B8CCE4', '#95AFD1', '#7292BE',  // light -> dark
-               '#4F76AB', '#3B6EA5', '#27496B'],
+    age:      ['#BDD7EE', '#6BAED6', '#2171B5', '#08306B'],  // 18-34 ... 65+, light -> dark
     // Substance use is an ORDERED variable, so it gets an ordered ramp running
     // green -> amber -> red as involvement increases. Deliberately unlike the
     // blue-based politics and age palettes, so the reader never confuses which
@@ -81,12 +80,10 @@
   // ---- second-pilot splits ---------------------------------------------------
   // Both are yes/no questions rather than ordered scales, so they get two
   // clearly contrasting hues rather than a ramp.
-  PALETTE.stad = ['#3B6EA5', '#8FA9C4'];       // grote stad / geen grote stad
+  PALETTE.stad = ['#1B6F8A', '#E39B2D'];       // urban / less urban
   PALETTE.mdma = ['#B22222', '#2E7D5B'];       // tegen / voor regulering
-  // Education is ORDERED and stacked, like the age bands, so it gets the same
-  // light-to-dark ramp: six steps for the survey's six answer options.
-  PALETTE.opleiding = ['#DCE6F1', '#B8CCE4', '#95AFD1', '#7292BE',
-                       '#4F76AB', '#27496B'];
+  // Education: three side-by-side groups, so three clearly different hues.
+  PALETTE.opleiding = ['#F2994A', '#B8327F', '#3F2A7E'];   // practical / middle / theoretical
 
   var PLAIN = '#3B6EA5';
 
@@ -134,7 +131,7 @@
                //                    goes to counts under such a split.
                //   block.multi      the CHART is the emotion question itself,
                //                    where one respondent can fill several bars.
-               values: v, n: dem.n[i],
+               values: v, n: dem.nw ? dem.nw[i] : dem.n[i],   // weighted group size: the percentage base
                pct: dem.mode === 'grouped' && !dem.overlapping &&
                     !block.multi && !state.counts };
     });
@@ -247,15 +244,26 @@
       }
     } else {
       var g = vals.length, bw2 = (slot * 0.78) / g;
+      // block.catColours: one colour per answer option (the policy rules, as in main.tex). Without a
+      // split each bar is one option, so it takes that colour; under a split colour marks the groups.
+      var byCat = block.catColours && state.split === 'all';
       for (var c2 = 0; c2 < k; c2++) {
         for (var si2 = 0; si2 < g; si2++) {
           var v2 = vals[si2][c2];
           var x1 = mL + slot * c2 + slot * 0.11 + bw2 * si2;
           if (v2 > 0) {
             s += '<rect x="' + x1 + '" y="' + y(v2) + '" width="' + (bw2 * 0.92) +
-                 '" height="' + (mT + ph - y(v2)) + '" fill="' + ss[si2].colour + '"/>';
+                 '" height="' + (mT + ph - y(v2)) + '" fill="' +
+                 (byCat ? block.catColours[c2] : ss[si2].colour) + '"/>';
           }
         }
+      }
+    }
+    // under a split (or stacked), a strip in the option's colour under each category keeps the coding visible
+    if (block.catColours && state.split !== 'all') {
+      for (var c3 = 0; c3 < k; c3++) {
+        s += '<rect x="' + (mL + slot * c3 + slot * 0.11) + '" y="' + (mT + ph + 1) + '" width="' +
+             (slot * 0.78) + '" height="4" fill="' + block.catColours[c3] + '"/>';
       }
     }
 

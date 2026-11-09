@@ -32,11 +32,9 @@ stopifnot(sum(as.integer(df$edu_clean) == 10) == 0)
 # categories, top first (NULL = parties, ordered by their share choosing a ban below)
 versions <- list(
   coarse = list(
-    Age = list(cat = str_replace(as.character(df$age_4_rec), "-", "–"), order = c("18–34", "35–49", "50–64", "65+")),
-    Education = list(cat = c("Practical", "Middle", "Theoretical")[as.integer(df$edu_3_rec)],
-                     order = c("Theoretical", "Middle", "Practical")),
-    Urbanisation = list(cat = c("Urban", "Urban", "Less urban", "Less urban", "Less urban")[as.integer(df$urb)],
-                        order = c("Urban", "Less urban")),
+    Age = list(cat = as.character(df$age_group), order = levels(df$age_group)),
+    Education = list(cat = as.character(df$edu_group), order = levels(df$edu_group)),
+    Urbanisation = list(cat = as.character(df$urb_group), order = levels(df$urb_group)),
     Vote = list(cat = str_to_sentence(as.character(df$vote_3)), order = c("Left", "Middle", "Right"))
   ),
   detailed = list(
@@ -150,8 +148,8 @@ caption <- paste0(
   sprintf(r"(less urban = moderate, low or none (%d respondents without urbanisation are not in those rows). )",
           sum(is.na(df$urb))),
   r"(Vote (TK 2025) by the party's general left-right position in the Chapel Hill Expert Survey 2024 )",
-  r"(\parencite{rovny2025}, split into equal thirds of the 0--10 scale: left = SP, PvdD, GroenLinks-PvdA; )",
-  r"(middle = DENK, Volt, CU, D66, 50PLUS (2019 score), CDA; right = VVD, BBB, SGP, PVV, FvD and JA21 (not )",
+  r"(\parencite{rovny2025}, split into equal thirds of the 0--10 scale: left = SP, PvdD, GroenLinks-PvdA, )",
+  r"(Volt (4.55, set to left by hand); middle = DENK, CU, D66, 50PLUS (2019 score), CDA; right = VVD, BBB, SGP, PVV, FvD and JA21 (not )",
   sprintf(r"(rated; placed between VVD and PVV). Other parties, blank and non-voters ($n = %d$) are not in the vote rows.)",
           sum(is.na(df$vote_3)))
 )

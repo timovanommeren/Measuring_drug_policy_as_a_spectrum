@@ -17,14 +17,14 @@ cor_drugs <- c(cannabis = "Cannabis", psychedelica = "Psychedelics", mdma = "MDM
                  cocaine = "Cocaine / crack", speed = "Speed", heroine = "Heroin")
 cor_vars <- paste0("beleid_voorkeur_", names(cor_drugs))
 
-item_vars <- grep("^beliefs_", names(df), value = TRUE)
+item_vars <- grep("^beliefs_[a-z]+_[0-9]+$", names(df), value = TRUE)
 stopifnot(length(item_vars) == 18)
 
 item_labels <- map_chr(item_vars, \(v) attr(df[[v]], "label"))
 
 dat <- df |>
   select(w, all_of(c(cor_vars, item_vars))) |>
-  mutate(across(all_of(item_vars), \(x) replace(as.numeric(x), x == 99, NA)),
+  mutate(across(all_of(item_vars), as.numeric),
          across(all_of(cor_vars), as.numeric))
 
 wcor <- function(x, y, w) {

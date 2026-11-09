@@ -1,29 +1,20 @@
 % ===========================================================================
-% DRAFT Methods section -- structure after Zuljevic et al. (2022, Sci Rep).
-% Not yet \input in main.tex. To use: replace the current \section{Methods}
-% in main.tex with \input{methods_draft}, and move the RQ subsection to the
-% end of the Introduction.
-%
-% [TODO ...] marks a fact I could not find in the repo. Numbers marked
-% (data) were computed from NLOZ26-10_Drugsbeleid_gedeeld_261022.csv on
-% 9 Nov 2026; please recompute in R before submission.
-% English item wordings are my translations: check them.
-%
-% New bib keys used (now in references.bib): rosenberg1960, eagly1993
+% Methods section, \input in main.tex under \section{Methods}.
+% Every number from the main-study data is a macro from out/methods_numbers.tex,
+% written by analysis/R/04_methods_numbers.R: rerun that script, do not type numbers here.
+% Pilot numbers (n, item counts) come from the pilot data in the Qualtrics project.
+% Item wording: appendix_items.tex.
 % ===========================================================================
-
-\section{Methods}
 
 \subsection{Study design}
 
-The study is an observational, cross-sectional online survey of Dutch adults. The instrument was
-developed over two pilot studies and then fielded once in a sample drawn from the Kieskompas panel.
-[TODO: preregistered? If so, OSF link and date; if not, say so.] The study was approved by the Ethics
-Review Board of the Psychology research institute, University of Amsterdam (FMG-20487, 22 August
-2026).
+The study is an observational, cross-sectional online survey of Dutch adults. It was not
+preregistered. The instrument was developed over two pilot studies and then fielded once in a sample
+drawn from the Kieskompas panel. The study was approved by the Ethics Review Board of the Psychology
+research institute, University of Amsterdam (FMG-20487, 22 August 2026).
 
-The study introduces a new measure of drug policy preference, a nine-point regulation scale asked per substance, and a first set of attitude
-items intended to explain positions on it. The instrument and the criteria used to judge it follow from that aim, as described below.
+The study introduces a new measure of drug policy preference, a nine-point regulation scale asked per
+substance, and a first set of attitude items intended to explain positions on it.
 
 % ---------------------------------------------------------------------------
 \subsection{Development of the instrument}
@@ -45,15 +36,14 @@ restrictiveness of access, and so lies on a second dimension. Sanctions for pers
 measured instead by a belief item (Table~\ref{tab:measures}).
 
 Respondents rated nine substances: alcohol, tobacco and vapes, cannabis, psychedelics (such as
-mushrooms and LSD), MDMA, cocaine/crack, speed (amphetamine), heroin and strong painkillers. Each
-substance was answered on a slider with nine labelled stops, with a separate \emph{no opinion} option. [TODO: confirm the presentation in the Kieskompas/Survalyzer
-version: slider with stops, or radio buttons with icons? Fixed or random substance order?]
+mushrooms and LSD), MDMA, cocaine/crack, speed (amphetamine), heroin and strong painkillers. For each
+substance the nine options were shown as nine ordered buttons, with a separate \emph{no opinion}
+option. Substances were presented in random order.
 
-Before the substances, respondents answered two practice items about the current Dutch status of
-substances outside the study, ADHD medication (on prescription only) and coffee (sold everywhere,
-advertising allowed). These items taught the use of the scale. All respondents placed both correctly
-(data). [TODO: was a correct answer required to continue? If so, say so, and drop ``placed both
-correctly'' as evidence of comprehension.]
+Before rating the substances, respondents answered two practice items about the current Dutch rules
+for two substances outside the study: ADHD medication (on prescription only) and coffee (sold
+everywhere, advertising allowed). A correct answer was required to continue, so that every respondent
+had used the scale once before the substances.
 
 \subsubsection{The attitude items}
 
@@ -61,92 +51,86 @@ correctly'' as evidence of comprehension.]
 attitude: cognition (beliefs), affect (feelings) and behaviour \parencite{rosenberg1960,eagly1993}.
 How the items were selected follows from the Causal Attitude Network (CAN) model
 \parencite{dalege2016,dalege2018}. CAN treats an attitude as a network of evaluative reactions that
-influence one another, not as a latent variable of which the items are interchangeable indicators.
-The aim of item construction was therefore to map the reactions that plausibly make up a person's
-stance on drug regulation, and to measure each with one item. 
+influence one another. The aim of item construction was therefore to map the reactions that plausibly
+make up a person's stance on drug regulation, and to measure each with one item. Following
+recommendations for network studies \parencite{burger2022,chambon2026}, we wrote items with distinct
+content.
 
-\textbf{Network-analytic requirements.} Following current recommendations for network studies \parencite{burger2022,chambon2026}, we wrote items with distinct content and screened them for redundancy based on $\rho$, leave-one-out $\Delta R^2$, corrected item-rest.
-
-\textbf{Content.} Belief items cover four domains. Three of them correspond to the ways regulation is
-problematised in Dutch parliamentary debate: drug use and its health effects, organised crime, and the
-costs and consequences of allowing sale \parencite{vangelder2024}. They are \emph{addiction},
-\emph{crime} and \emph{regulation}. The fourth domain, \emph{society}, covers norms about autonomy,
-profit from addictive substances, and the international prohibition.
+\textbf{Content.} Belief items cover four domains: \emph{addiction}, \emph{crime}, the consequences of
+\emph{regulation}, and \emph{society}, the last covering norms about autonomy, profit from addictive
+substances and the international prohibition \parencite[cf.][]{vangelder2024}. Emotion items record
+whether respondents feel anger, fear or worry, or joy about six topics. Behaviour items describe what
+respondents would do in situations involving drugs. Own use and involvement with the topic were
+measured separately.
 
 \textbf{Wording.} Item wording drew on \citeauthor{saris2004}'s \citeyearpar{saris2004} typology of
 concepts-by-intuition, which links the concept an item measures to the linguistic form of the
 assertion. Where possible we preferred consequence beliefs (``If drugs could be sold legally, \ldots'')
 and statements about specific interventions to global evaluations (``The war on drugs is a failure'').
 Global evaluations predict policy stance well \parencite{bergquist2022}, but partly because they are
-conceptually close to the outcome \parencite{vysevkova2026}. All items were written at B1 level in
-Dutch. [TODO: number of items first drafted; who reviewed them (experts, LEAP, colleagues) and how
-many were changed or dropped at that stage.] The English wordings in Appendix~\ref{app:items} are our
-translations. [TODO: translated by whom; back-translated?]
+conceptually close to the outcome \parencite{vysevkova2026}. All items were written by the authors in
+Dutch, at B1 level. The English wordings in Appendix~\ref{app:items} are our own translations.
 
 \subsubsection{Pilot studies}
 
-Two pilots were run on an earlier version of the instrument. Pilot 1 was a convenience sample
-($n = 121$, August 2026); pilot 2 was a quota sample of Dutch adults recruited through Prolific
-($n = 120$, September 2026). Median completion times were 11.3 and 7.9 minutes. In the pilots policy
-preference was measured on a 0--100 slider with seven anchors, and the attitude battery held 66
-items.
+Two pilots were run on earlier versions of the instrument: a convenience sample ($n = 121$, August
+2026) and a quota sample of Dutch adults recruited through Prolific ($n = 120$, September 2026). In
+both, policy preference was measured on a 0--100 slider with seven anchors. Pilot 1 had 55 attitude
+items and pilot 2 had 47.
 
-Items were screened on three criteria \parencite{burger2022,chambon2026}: redundancy (Spearman
-$|\rho| \geq .50$ with another item), contribution to the explained variance in the policy sliders
-(leave-one-out $\Delta R^2_{\text{adj}}$), and corrected item--rest correlation within the block. Each
-criterion was calibrated against items whose answers had been permuted. Items that passed none of the
-criteria were dropped or rewritten. Most of these were low-endorsement emotion items.
-
-The main study differs from the pilots in five ways [TODO: check this list against the pilot-2
-\texttt{.qsf}]:
-\begin{enumerate}[label=(\roman*),nosep]
-  \item the seven-anchor slider was replaced by the nine options described above;
-  \item the belief battery was reduced from 21 to 18 items;
-  \item the emotion \emph{hope} was dropped, and the policy topic was split into \emph{war on drugs}
-        and \emph{legalisation of drugs};
-  \item involvement was measured with five items instead of three;
-  \item [TODO: name items removed for conceptual proximity to the outcome, e.g.\ the heroin-assisted
-        treatment item].
-\end{enumerate}
-The pilot results themselves are reported in Supplement~[TODO].
+Items were screened for redundancy (Spearman $\rho$ with other items), for their contribution to
+explaining the policy sliders (leave-one-out $\Delta R^2_{\mathrm{adj}}$), and for their corrected
+item--rest correlation within the block \parencite{burger2022,chambon2026}. On the basis of these
+results, items that added little were dropped or reworded, and own use was asked per substance group
+rather than per substance. The slider was replaced by the nine ordered options described above, which
+name each regulatory model explicitly rather than placing it between anchors. The main study has 48
+attitude items (Table~\ref{tab:measures}).
 
 % ---------------------------------------------------------------------------
 \subsection{Main study}
 
 \subsubsection{Participants and procedure}
 
-The main study was fielded through the Kieskompas panel, an opt-in online panel of Dutch adults,
-from 13 to 22 October 2026 (data). Invitations were stratified on [TODO: stratification variables].
-Respondents had to be 18 or older and give informed consent. [TODO: incentive, if any.] Of
-[TODO: number invited] panel members invited, 1{,}359 started the survey. Of these, 1{,}241 completed
-it and 118 broke off (data); incomplete interviews were excluded. 1{,}239 completed interviews
-received a survey weight and form the analytic sample. [TODO: why two completed interviews have no
-weight; response rate.] Median completion time was 10.1 minutes (data).
+The main study was fielded through the VIP panel of Kieskompas from \fieldStart\ to \fieldEnd. The VIP
+panel is a stratified random sample from Kieskompas's opt-in Grote Burgerpanel, stratified on Nielsen
+region, sex, age, education and migration background, with a correction for vote recall; the
+population frame is the CBS Gouden Standaard. Respondents had to be 18 or older and give informed
+consent.
 
-Kieskompas weighted the sample by iterative post-stratification (raking) to the marginal
-distributions, taken from Statistics Netherlands (CBS), of age, gender, education, migration
-background, Nielsen region and vote recall at the 2025 parliamentary election. [TODO: check this list
-against the Kieskompas weighting documentation; \texttt{00\_load\_and\_clean.R} lists sex, education,
-age, vote recall and province.] Weights were trimmed at the 99th percentile. All estimates are
-weighted unless stated otherwise. Weighting diagnostics are in Appendix~[TODO:
-\texttt{fig:weights}]. Table~[TODO] gives the unweighted and weighted sample composition.
+Of the \nInvited\ panel members invited, \nStarted\ started the survey and \nCompleted\ completed it
+(response rate \responseRate\%). The \nBrokeOff\ who broke off were excluded. Of the completed
+interviews, \nAnalytic\ provided the background variables needed for weighting and form the analytic
+sample. Median completion time was \medianMinutes\ minutes.
+
+Kieskompas weighted the sample by iterative post-stratification to marginal distributions from the CBS
+Gouden Standaard of age (four categories), sex (two), education (three), migration background
+(three: Dutch, EU, non-EU) and Nielsen region (five), and to the result of the 29 October 2025
+parliamentary election, with each party in parliament weighted separately and the remaining parties,
+blank votes and non-voters as further categories. Weights were trimmed at the 99th percentile. All
+estimates are weighted unless stated otherwise. Table~[TODO] gives the unweighted and weighted sample
+composition.
+
+The target sample size was 1{,}000. The weighting gives a design effect of \designEffect, so the
+effective sample size is \nEff\ \parencite{kish1965}, and a share of 50\% is estimated with a 95\%
+margin of error of $\pm$\marginError\ percentage points.
 
 \subsubsection{Measures}
 
 The questionnaire was administered in Dutch, in this order: policy preference, beliefs, behaviour,
 own use, emotions, involvement (Table~\ref{tab:measures}). Background variables (age, sex, education,
 region, urbanisation and vote recall) came from the panel profile. Belief and behaviour items were
-answered on seven-point agreement scales (\emph{strongly disagree} to \emph{strongly agree}) with a
-\emph{no opinion} option. Items on which agreement favours prohibition were reverse-scored, so that
-high scores indicate a more liberal position. \emph{No opinion} was chosen for 0.3--1.1\% of the
-policy ratings and at most 11.8\% of answers to any one belief item (data). The own-use items stated
-that answers were anonymous and could be skipped. The survey closed with a referral to the Drugs
-Infolijn, the national drug information line. All item wordings are in Appendix~\ref{app:items}.
+answered on seven-point agreement scales (\emph{strongly disagree} to \emph{strongly agree}); belief
+items had a \emph{no opinion} option. Items on which agreement favours prohibition were
+reverse-scored, so that high scores indicate a more liberal position. \emph{No opinion} was chosen
+for \noOpPolicyMin--\noOpPolicyMax\% of the policy ratings, depending on the substance, and for at
+most \noOpBeliefMax\% of answers to any one belief item; it is treated as missing. The own-use items
+stated that answers were anonymous and could be skipped. The survey closed with a referral to the
+Drugs Infolijn, the national drug information line.
 
-\begin{table}[H]
+\begin{table}[htbp]
 \centering
 \small
-\caption{Measures in the main study.}
+\caption{Measures in the main study. Full item wording in Appendix~\ref{app:items}.}
 \label{tab:measures}
 \begin{tabularx}{\linewidth}{@{}l l c l X@{}}
 \toprule
@@ -173,84 +157,17 @@ Involvement & -- & 5 & slider 0--100 & How a party deals with drugs and drug cri
 % ---------------------------------------------------------------------------
 \subsection{Statistical analysis}
 
-All analyses were done in R [TODO: version] with the \texttt{survey} package for weighted estimates;
-code is available at [TODO: repository URL]. The analyses follow the two research questions.
+All analyses were done in R \rVersion\ \parencite{rcore}, using the \texttt{survey} package
+\parencite{lumley2004} for weighted estimates and design-based standard errors. Code is available at
+\url{https://github.com/timovanommeren/Measuring_drug_policy_as_a_spectrum}; the data are available
+from the authors on request.
 
-\textbf{Distribution of preferences (RQ1).} For each substance we report the weighted share choosing
-each of the nine options, with 95\% confidence intervals [TODO: design-based CIs?]. We compare shares
-across age, education, urbanisation and political orientation, and summarise each party's voters by
-their mean position on the illicit and the legal substances. [TODO: say how the mean of an ordinal
-scale is justified here, or report medians.]
+\textbf{Distribution of preferences.} For each substance we report the weighted share choosing each of
+the nine options, with design-based 95\% confidence intervals. We compare shares across age,
+education, urbanisation and political orientation, and summarise each party's voters by their mean
+position on the illicit and on the legal substances. That summary treats the nine options as equally
+spaced.
 
-\textbf{Explaining preferences (RQ1).} Policy preferences are related to the attitude items through
-weighted correlations (Appendix, Table~[TODO]) and [TODO: the regression model: ordinal or linear,
-per substance or stacked, which covariates]. We report the variance explained per block and per
-substance.
-
-\textbf{Attitude network (RQ2).} The attitude items and the policy ratings are modelled as a mixed
-graphical model with EBIC model selection \parencite{haslbeck2020}. Edge accuracy and centrality
-stability are assessed by bootstrap \parencite{epskamp2018}. Involvement enters as a continuous
-moderator of the edge weights \parencite{haslbeck2021}, and the modality of preferences is estimated
-per involvement quartile \parencite{hoffstadt2026}.
-
-\textbf{Sample size.} [TODO: rationale. E.g.\ with $n = 1{,}239$ a share of 50\% is estimated within
-$\pm 2.8$ points (95\%) before design effects; and/or network-recovery simulations for the number
-of nodes.]
-
-\textbf{Why no factor-analytic validation.} We report neither internal consistency coefficients nor a
-confirmatory factor model for the attitude blocks. Both assume that the items of a block are
-exchangeable indicators of one latent variable. The items were constructed to be distinct reactions
-in a network, so low inter-item correlations within a block are by design, not a failure of
-reliability \parencite{dalege2016,burger2022}. The instrument is judged instead by whether
-respondents use the full regulation scale, how often they choose \emph{no opinion}, and how well the
-attitude items account for positions on the scale.
-
-% ---------------------------------------------------------------------------
-% APPENDIX -- move below \appendix in main.tex
-% ---------------------------------------------------------------------------
-\section{Item wording}
-\label{app:items}
-
-\begin{table}[H]
-\centering
-\scriptsize
-\caption{Attitude items in the main study: Dutch original and English translation. R = reverse-scored
-(agreement favours prohibition).}
-\begin{tabularx}{\linewidth}{@{}l X X c@{}}
-\toprule
-Item & Dutch & English & R \\
-\midrule
-society\_1 & Mensen moeten zelf kunnen beslissen of ze schadelijke middelen gebruiken. & People should be able to decide for themselves whether they use harmful substances. & \\
-society\_2 & Drugsgebruik is slecht voor de normen en waarden van onze samenleving. & Drug use is bad for the norms and values of our society. & R \\
-society\_3 & Nederland moet zich houden aan het internationale verbod op drugs. & The Netherlands should abide by the international prohibition of drugs. & R \\
-society\_4 & Het is verkeerd om geld te verdienen aan middelen waar mensen verslaafd aan kunnen raken. & It is wrong to make money from substances people can become addicted to. & R \\
-society\_5 & We moeten streven naar een samenleving waarin niemand verslavende middelen gebruikt. & We should strive for a society in which nobody uses addictive substances. & R \\
-\addlinespace
-addiction\_1 & Als een middel legaal te koop is, raken meer mensen eraan verslaafd. & If a substance can be bought legally, more people become addicted to it. & R \\
-addiction\_2 & Mensen die verslaafd zijn zoeken eerder hulp als drugs niet verboden zijn. & People who are addicted seek help sooner if drugs are not prohibited. & \\
-addiction\_3 & Mensen die verslaafd zijn hebben dat aan zichzelf te danken. & People who are addicted have only themselves to blame. & R \\
-addiction\_4 & Mensen die softdrugs gebruiken, gaan daarna ook vaak harddrugs gebruiken. & People who use soft drugs often go on to use hard drugs. & R \\
-addiction\_5 & Veel verboden harddrugs zijn ongezonder dan alcohol en tabak. & Many prohibited hard drugs are less healthy than alcohol and tobacco. & R \\
-\addlinespace
-regulate\_1 & Als een middel verboden is, gebruiken minder mensen het. & If a substance is prohibited, fewer people use it. & R \\
-regulate\_2 & De verkoop van drugs toestaan zou Nederland veel geld opleveren. & Allowing the sale of drugs would earn the Netherlands a lot of money. & \\
-regulate\_3 & Drugsgebruik is minder gevaarlijk als de verkoop wordt toegestaan. & Drug use is less dangerous if sale is allowed. & \\
-regulate\_4 & Een verbod werkt goed om jongeren te beschermen tegen de gevaren van verslavende middelen. & A ban works well to protect young people from the dangers of addictive substances. & R \\
-\addlinespace
-crime\_1 & Er zou in Nederland minder criminaliteit zijn als de verkoop van drugs wordt toegestaan. & There would be less crime in the Netherlands if the sale of drugs were allowed. & \\
-crime\_2 & Er zou meer politie moeten worden ingezet voor de aanpak van drugs. & More police should be deployed to tackle drugs. & R \\
-crime\_3 & Het bezit van drugs voor eigen gebruik moet niet strafbaar zijn. & Possessing drugs for personal use should not be a criminal offence. & \\
-crime\_4 & Drugsgebruikers zijn medeverantwoordelijk voor drugscriminaliteit. & Drug users share responsibility for drug-related crime. & R \\
-\addlinespace
-gedrag\_1 & Als ik weet dat iemand drugs verkoopt, zou ik dat altijd bij de politie melden. & If I knew someone was selling drugs, I would always report it to the police. & R \\
-gedrag\_2 & Ik vermijd mensen die drugs gebruiken. & I avoid people who use drugs. & R \\
-gedrag\_3 & Als iemand een drug heeft gebruikt die ik niet ken, zou ik die persoon daar vragen over stellen. & If someone had used a drug I did not know, I would ask them about it. & \\
-\addlinespace
-betrokkenheid\_1 & Ik heb in mijn omgeving te maken met criminaliteit door drugs. & I encounter drug-related crime in my surroundings. & \\
-betrokkenheid\_1b & Ik heb in mijn omgeving te maken met drugs. & I encounter drugs in my surroundings. & \\
-betrokkenheid\_2 & Ik weet over drugs meer dan de meeste mensen. & I know more about drugs than most people. & \\
-betrokkenheid\_2b & Ik weet over drugscriminaliteit meer dan de meeste mensen. & I know more about drug crime than most people. & \\
-betrokkenheid\_3 & Hoe een partij omgaat met drugs en drugscriminaliteit, weegt mee bij mijn stemkeuze. & How a party deals with drugs and drug crime affects my vote. & \\
-\bottomrule
-\end{tabularx}
-\end{table}
+\textbf{Explaining preferences.} Each substance's policy preference is regressed on the attitude
+items, using the survey weights and design-based standard errors. [TODO: linear or ordinal model;
+covariates.] We report the variance explained per block and per substance.

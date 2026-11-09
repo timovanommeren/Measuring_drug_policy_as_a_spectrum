@@ -46,9 +46,10 @@ Every script sources `00_load_and_clean.R` itself, so each can be run on its own
 | Figure 3: preferences by demographic | `out/fig_gradient_grid.tex/.pdf` | `02_fig_gradient_grid.R` |
 | Figure 4a: party map | `out/fig_party_map.tex/.pdf` | `03_fig_party_map.R` |
 | Figure 4b: quadrants on the U-curve | `figures/fig_regulation_quadrants.pdf` | made by hand |
+| Methods: numbers in the text (macros) | `out/methods_numbers.tex` | `04_methods_numbers.R` |
+| Methods: sample composition table | `out/tab_sample_composition.tex` | `05_tab_sample_composition.R` |
 | Appendix: Figure 3, detailed categories | `out/fig_gradient_grid_detailed.tex/.pdf` | `02_fig_gradient_grid.R` |
 | Appendix: attitude correlations | `out/tab_attitude_correlations.tex` | `A2_attitudes.R` |
-| Appendix: weighting | `out/fig_weights.tex/.pdf` | `A1_weights.R` |
 
 The `.tex` snippets contain the figure environment with its caption. Numbers in captions (sample sizes
 etc.) are computed in R, so edit captions in the R script, not in `out/`. After rerunning a script,

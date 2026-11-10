@@ -27,12 +27,24 @@ splits$party <- list(label = "Partij (stemherinnering)", groups = levels(party),
 splits <- map(splits, \(s) s[c("label", "groups", "assign")])
 
 # the respondent table under the map (rows for the dots selected with a box, and their profile against the sample)
-as_group <- \(label, column) { column <- droplevels(as.factor(column)); list(label = label, groups = levels(column), assign = as.integer(column)) }
+# education and urbanisation at their finest level here (the splits use the 3 and 2 groups): edu_clean's
+# ten categories and urb's five address-density classes, both lowest first, labels shortened from the codebook.
+# ordered = TRUE keeps them in that order, all categories shown, in the profile above the table
+edu_detail <- factor(as.numeric(d$edu_clean), levels = 10:1,
+                     labels = c("Geen onderwijs", "Basisonderwijs", "Praktijk/VSO", "MBO 1/VMBO-b/k", "MAVO/VMBO-t",
+                                "MBO 2-4", "HAVO/VWO", "HBO/WO propedeuse", "HBO/WO bachelor", "HBO/WO master"))
+urb_detail <- factor(as.numeric(d$urb), levels = 5:1,
+                     labels = c("Niet (<500)", "Weinig (500-1000)", "Matig (1000-1500)", "Sterk (1500-2500)",
+                                "Zeer sterk (2500+)"))
+as_group <- \(label, column, ordered = FALSE) {
+  column <- droplevels(as.factor(column))
+  list(label = label, groups = levels(column), assign = as.integer(column), ordered = ordered)
+}
 info <- list(
   sex  = as_group("Sex", d$sex_rec),
   age  = as_group("Age", d$age_group),
-  edu  = as_group("Education", fct_rev(d$edu_group)),
-  urb  = as_group("Urbanisation", d$urb_group),
+  edu  = as_group("Education", edu_detail, ordered = TRUE),
+  urb  = as_group("Urbanisation (addresses/km2)", urb_detail, ordered = TRUE),
   prov = as_group("Province", d$geo_prov_rec),
   vote = as_group("Vote (TK 2025)", d$vote_recall_rec),
   use  = as_group("Own use (heaviest ever)", d$substance_ladder)

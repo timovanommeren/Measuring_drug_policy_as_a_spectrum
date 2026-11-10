@@ -38,6 +38,7 @@
   table.profile { border-collapse: collapse; margin: 6px 0 14px; }
   table.profile td { padding: 2px 10px 2px 0; vertical-align: top; }
   table.profile td:first-child { color: #555; white-space: nowrap; }
+  table.profile td span { white-space: nowrap; }
   table.profile .up { color: #00664a; font-weight: 600; } table.profile .down { color: #9b2c2c; }
   table.rows { border-collapse: collapse; }
   table.rows th { text-align: left; font-weight: 600; color: #444; border-bottom: 1px solid #ccc; padding: 3px 8px 3px 0; white-space: nowrap; }
@@ -353,24 +354,25 @@ function renderSelection(spec) {
     return;
   }
   const wsum = idx => idx.reduce((a, i) => a + D.w[i], 0);
-  // profile: per variable, every category's weighted share in the selection against everyone on the map
-  // (among those with an answer); categories that are 10+ points over- or under-represented are marked
+  // profile: per variable, every category's weighted share in the selection (among those with an answer);
+  // categories 10+ points over- or under-represented against everyone on the map are marked
   const share = (idx, v, k) => { const has = idx.filter(i => v.assign[i] != null), t = wsum(has);
                                  return t ? wsum(has.filter(i => v.assign[i] === k)) / t : 0; };
   const prof = Object.values(D.info).map(v => {
-    const cats = v.groups.map((gname, j) => ({ gname, s: share(sel, v, j + 1), b: share(C.valid, v, j + 1) }))
-                        .filter(c => c.s > 0 || v.groups.length <= 4)
-                        .sort((a, b) => v.groups.length > 4 ? b.s - a.s : 0);
-    const shown = cats.slice(0, 6).map(c => {
+    // ordered variables (education, urbanisation): every category, low to high; others with more than four
+    // categories (party, province): those in the selection, largest first, at most six
+    const all = v.groups.map((gname, j) => ({ gname, s: share(sel, v, j + 1), b: share(C.valid, v, j + 1) }));
+    const cats = v.ordered || v.groups.length <= 4 ? all : all.filter(c => c.s > 0).sort((a, b) => b.s - a.s);
+    const shown = (v.ordered ? cats : cats.slice(0, 6)).map(c => {
       const cls = c.s - c.b >= 0.10 ? "up" : (c.b - c.s >= 0.10 ? "down" : "");
-      return `<span class="${cls}">${esc(c.gname)} ${Math.round(100 * c.s)}%</span> <span style="color:#999">(${Math.round(100 * c.b)}%)</span>`;
+      return `<span class="${cls}">${esc(c.gname)} ${Math.round(100 * c.s)}%</span>`;
     }).join(" · ");
-    return `<tr><td>${v.label}</td><td>${shown}${cats.length > 6 ? " · …" : ""}</td></tr>`;
+    return `<tr><td>${v.label}</td><td>${shown}${!v.ordered && cats.length > 6 ? " · …" : ""}</td></tr>`;
   });
   const wmean = (idx, a) => { const h = idx.filter(i => a[i] != null), t = wsum(h); return t ? h.reduce((s, i) => s + D.w[i] * a[i], 0) / t : NaN; };
-  prof.push(`<tr><td>Involvement (mean)</td><td>${Math.round(wmean(sel, D.involvement))} <span style="color:#999">(${Math.round(wmean(C.valid, D.involvement))})</span></td></tr>`);
+  prof.push(`<tr><td>Involvement (mean)</td><td>${Math.round(wmean(sel, D.involvement))}</td></tr>`);
   prof.push(`<tr><td>Policy (mean)</td><td>${POLICY_DRUGS.map(([d, l]) =>
-    `${l} ${wmean(sel, D.answers[d]).toFixed(1)} <span style="color:#999">(${wmean(C.valid, D.answers[d]).toFixed(1)})</span>`).join(" · ")}</td></tr>`);
+    `${l} ${wmean(sel, D.answers[d]).toFixed(1)}`).join(" · ")}</td></tr>`);
 
   // rows, at most 300
   const lab = (v, i) => v.assign[i] == null ? "–" : esc(v.groups[v.assign[i] - 1]);
@@ -383,14 +385,14 @@ function renderSelection(spec) {
     <td>${lab(I.urb, i)}</td><td>${lab(I.prov, i)}</td><td>${lab(I.vote, i)}</td><td>${lab(I.use, i)}</td>
     <td style="text-align:right">${D.involvement[i] == null ? "–" : Math.round(D.involvement[i])}</td><td>${strip(i)}</td>
     ${colourCol ? `<td style="text-align:center">${val(i)}</td>` : ""}</tr>`).join("");
-  const head = `<tr><th>Sex</th><th>Age</th><th>Education</th><th>Urbanisation</th><th>Province</th><th>Vote</th><th>Own use</th>
+  const head = `<tr><th>Sex</th><th>Age</th><th>Education</th><th title="Address density, addresses per km2">Urbanisation</th><th>Province</th><th>Vote</th><th>Own use</th>
     <th>Involv.</th><th><span class="strip">${POLICY_DRUGS.map(([, l]) => `<b style="font-weight:600;font-size:9.5px">${l}</b>`).join("")}</span></th>
     ${colourCol ? `<th title="${esc(spec.v.label)}">Colour item</th>` : ""}</tr>`;
 
   box.innerHTML = `<h2>Selected respondents: ${sel.length} <span style="font-weight:400;color:#777;font-size:12px">
     (${Math.round(100 * wsum(sel) / wsum(C.valid))}% of the map, weighted)</span><button id="clear">Clear selection</button></h2>
-    <div class="hint">Profile: weighted share of the selection in each category, in brackets everyone on the map; green = 10+ points
-    over-represented, red = 10+ under. ${sel.length < 30 ? "<b>Fewer than 30 respondents: read the shares as counts, not as estimates.</b>" : ""}</div>
+    <div class="hint">Profile: weighted share of the selection in each category; green = 10+ points more than on the whole map,
+    red = 10+ points less. ${sel.length < 30 ? "<b>Fewer than 30 respondents: read the shares as counts, not as estimates.</b>" : ""}</div>
     <table class="profile">${prof.join("")}</table>
     <table class="rows">${head}${rows}</table>
     ${sel.length > 300 ? `<div class="hint">Showing the first 300 of ${sel.length}.</div>` : ""}

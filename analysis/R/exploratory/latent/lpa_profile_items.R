@@ -12,7 +12,9 @@ source(here::here("analysis", "R", "00_load_and_clean.R"))
 # prohibition are marked with an asterisk. A profile's mean weights each respondent by their posterior probability
 # of the profile times the survey weight, so uncertain respondents count partly in several profiles.
 # Needs analysis/output/latent_models/lpa/lpa_fits.rds (run lpa_profiles.R first).
-# Output: analysis/output/latent_models/lpa/fig_lpa_items.pdf
+# Output: analysis/output/latent_models/lpa/fig_lpa_items.pdf, and fig_lpa_items.html: the same as a page with
+# the blocks stacked, a button per profile and a button to reverse-score the * items (lpa_profile_items_template.html).
+# The page holds only the profile means, no respondent-level data.
 
 fit <- read_rds(here::here("analysis", "output", "latent_models", "lpa", "lpa_fits.rds"))[["model_1_class_4"]]
 
@@ -53,7 +55,9 @@ items <- bind_rows(
                          label_of))
 ) |>
   mutate(block = fct_inorder(block),
-         label = if_else(var %in% anti_items, paste0("* ", label), label),
+         anti = var %in% anti_items,
+         full_label = label,
+         label = if_else(anti, paste0("* ", label), label),
          label = str_trunc(label, 62),
          pos = row_number())
 
@@ -107,3 +111,27 @@ p <- wrap_plots(panels, nrow = 1, widths = as.numeric(table(items$block)) + 1.5,
 
 out <- here::here("analysis", "output", "latent_models", "lpa", "fig_lpa_items.pdf")
 ggsave(out, p, width = 17, height = 7.5, device = cairo_pdf)
+
+# the interactive page: blocks stacked, profiles switchable, * items reverse-scorable
+block_scales <- c("1 = ban ... 9 = free sale", "1 = strongly disagree ... 7 = strongly agree", "1 = strongly disagree ... 7 = strongly agree",
+                  "1 = never ... 4 = often", "% ticked", "0-100")
+blocks <- imap(levels(items$block), \(b, k) {
+  it <- filter(items, block == b)
+  list(title = str_remove(b, "\n.*$"), scale = block_scales[k], ymin = y_limits[[k]][1], ymax = y_limits[[k]][2],
+       ticks = keep(scales::breaks_pretty(n = 5)(y_limits[[k]]), \(t) t >= y_limits[[k]][1] & t <= y_limits[[k]][2]),
+       percent = k == 5,
+       items = pmap(it, \(var, full_label, anti, ...) list(
+         label = full_label, anti = anti,
+         means = unname(filter(item_means, var == !!var)$mean[order(filter(item_means, var == !!var)$profile)]))))
+})
+page <- list(
+  profiles = map2(profile_names, unname(profile_colours), \(n, c) list(name = n, colour = c)),
+  blocks = blocks,
+  footnote = paste("Within the policy, belief and behaviour blocks the order was randomised per respondent; there the",
+                   "items follow the questionnaire's numbering. Profile means weight respondents by their posterior",
+                   "probability of the profile times the survey weight;",
+                   sprintf("n = %d respondents with all three LPA indicators.", nrow(d)))
+)
+template <- read_file(here::here("analysis", "R", "exploratory", "latent", "lpa_profile_items_template.html"))
+write_file(str_replace(template, fixed("__DATA__"), as.character(jsonlite::toJSON(page, auto_unbox = TRUE, digits = 4, na = "null"))),
+           here::here("analysis", "output", "latent_models", "lpa", "fig_lpa_items.html"))

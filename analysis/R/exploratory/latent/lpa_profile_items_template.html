@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The four latent profiles across the questionnaire</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 20px 28px; color: #222; max-width: 1400px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 12.5px; margin-bottom: 12px; max-width: 1050px; line-height: 1.45; }
+  #buttons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; position: sticky; top: 0; background: #fff;
+             padding: 8px 0; z-index: 2; border-bottom: 1px solid #eee; }
+  #buttons button { font-size: 12.5px; padding: 5px 10px; border-radius: 4px; border: 2px solid; background: #fff;
+                    cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  #buttons button i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  #buttons button.off { opacity: 0.45; border-color: #ccc !important; }
+  #buttons .all { border-color: #999; color: #444; }
+  .block { margin-top: 22px; }
+  .block h2 { font-size: 14px; margin: 0 0 2px; }
+  .block .scale { font-size: 12px; color: #777; font-weight: 400; }
+  svg text { font-family: inherit; }
+  #tip { position: fixed; pointer-events: none; background: rgba(255,255,255,0.97); border: 1px solid #ccc;
+         border-radius: 4px; padding: 7px 9px; font-size: 12px; line-height: 1.45; display: none;
+         box-shadow: 0 2px 6px rgba(0,0,0,0.12); max-width: 380px; }
+  .foot { font-size: 11.5px; color: #777; margin-top: 18px; max-width: 1050px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<h1>The four latent profiles across the questionnaire</h1>
+<div class="sub">LPA model 1 (equal variances), four profiles. Each line is a profile's mean answer per item, items in
+survey order, one panel per block on its own answer scale. Answers as given, unless reverse-scoring is on:
+<b>*</b> marks items where agreeing favours prohibition; with reverse-scoring on (<b>*R</b>) these are flipped (8 &minus; answer),
+so on every belief and behaviour item 7 is the most liberal answer. Turn profiles on and off with the buttons; hover over a point for
+the item and all four means.</div>
+<div id="buttons"></div>
+<div id="blocks"></div>
+<div class="foot" id="foot"></div>
+<div id="tip"></div>
+
+<script>
+const D = __DATA__;
+const NS = "http://www.w3.org/2000/svg";
+const on = D.profiles.map(() => true);
+let reversed = false;   // reverse-score the * items (8 - answer), so 7 = most liberal on every belief and behaviour item
+const mean = (it, k) => it.means[k] == null ? null : (reversed && it.anti ? 8 - it.means[k] : it.means[k]);
+const tip = document.getElementById("tip");
+
+function el(name, attrs, parent) { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+// ---- buttons ----
+const B = document.getElementById("buttons");
+D.profiles.forEach((p, k) => {
+  const b = document.createElement("button");
+  b.style.borderColor = p.colour; b.innerHTML = `<i style="background:${p.colour}"></i>${esc(p.name)}`;
+  b.onclick = () => { on[k] = !on[k]; b.classList.toggle("off", !on[k]); draw(); };
+  B.appendChild(b);
+});
+const rv = document.createElement("button"); rv.className = "all"; rv.id = "reverse";
+rv.textContent = "Reverse-score * items: off";
+rv.onclick = () => { reversed = !reversed; rv.textContent = "Reverse-score * items: " + (reversed ? "on (7 = most liberal)" : "off");
+                     rv.style.background = reversed ? "#eee" : "#fff"; draw(); };
+[["All", true], ["None", false]].forEach(([t, v]) => {
+  const b = document.createElement("button"); b.className = "all"; b.textContent = t;
+  b.onclick = () => { on.fill(v); B.querySelectorAll("button:not(.all)").forEach(x => x.classList.toggle("off", !v)); draw(); };
+  B.appendChild(b);
+});
+B.appendChild(rv);
+document.getElementById("foot").textContent = D.footnote;
+
+// split a label into lines of at most n characters, on spaces
+function wrap(s, n) {
+  const words = s.split(" "), lines = [];
+  let cur = "";
+  words.forEach(w => { if ((cur + " " + w).trim().length > n && cur) { lines.push(cur); cur = w; } else cur = (cur + " " + w).trim(); });
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function fmt(v, block) { return v == null ? "–" : (block.percent ? Math.round(v) + "%" : v.toFixed(2)); }
+
+// ---- one block ----
+function blockPanel(block) {
+  const W = Math.min(document.body.clientWidth, 1400) - 10;
+  const n = block.items.length, m = { l: 46, r: 14, t: 10 };
+  const step = (W - m.l - m.r) / n, chars = Math.max(10, Math.floor(step / 6.1));
+  const wrapped = block.items.map(it => wrap(it.label, chars));
+  const labelLines = Math.min(9, Math.max(...wrapped.map(w => w.length)));
+  const plotH = 250, H = m.t + plotH + 14 + labelLines * 12 + 6;
+  const sx = j => m.l + step * (j + 0.5);
+  const sy = v => m.t + plotH - (v - block.ymin) / (block.ymax - block.ymin) * plotH;
+
+  const div = document.createElement("div"); div.className = "block";
+  div.innerHTML = `<h2>${esc(block.title)} <span class="scale">${esc(block.scale)}</span></h2>`;
+  const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, div);
+
+  // y grid and ticks
+  block.ticks.forEach(t => {
+    el("line", { x1: m.l, x2: W - m.r, y1: sy(t), y2: sy(t), stroke: "#eee" }, svg);
+    const tx = el("text", { x: m.l - 6, y: sy(t) + 3.5, "font-size": 10.5, fill: "#666", "text-anchor": "end" }, svg);
+    tx.textContent = block.percent ? t + "%" : t;
+  });
+  // x: a faint column per item, the wrapped label under it
+  block.items.forEach((it, j) => {
+    el("line", { x1: sx(j), x2: sx(j), y1: m.t, y2: m.t + plotH, stroke: "#f4f4f4" }, svg);
+    const lines = wrapped[j].slice(0, labelLines);
+    if (wrapped[j].length > labelLines) lines[labelLines - 1] += " …";
+    lines.forEach((ln, r) => {
+      const t = el("text", { x: sx(j), y: m.t + plotH + 14 + r * 12, "font-size": 10, fill: it.anti ? "#7a2e2e" : "#444",
+                             "text-anchor": "middle" }, svg);
+      t.textContent = (r === 0 && it.anti ? (reversed ? "*R " : "* ") : "") + ln;
+    });
+  });
+  // lines and points per profile that is on
+  D.profiles.forEach((p, k) => {
+    if (!on[k]) return;
+    const pts = block.items.map((it, j) => mean(it, k) == null ? null : [sx(j), sy(mean(it, k))]);
+    const d = pts.map((q, j) => q ? (j && pts[j - 1] ? "L" : "M") + q[0].toFixed(1) + "," + q[1].toFixed(1) : "").join("");
+    el("path", { d, fill: "none", stroke: p.colour, "stroke-width": 2.2, "stroke-linejoin": "round" }, svg);
+    pts.forEach(q => q && el("circle", { cx: q[0], cy: q[1], r: 3.6, fill: p.colour, stroke: "#fff", "stroke-width": 1 }, svg));
+  });
+  // hover: a transparent column per item
+  block.items.forEach((it, j) => {
+    const r = el("rect", { x: sx(j) - step / 2, y: m.t, width: step, height: plotH, fill: "transparent" }, svg);
+    r.addEventListener("mousemove", e => {
+      tip.innerHTML = `<b>${it.anti ? "* " : ""}${esc(it.label)}</b>` +
+        (it.anti && reversed ? `<br><span style="color:#7a2e2e">reverse-scored: 7 = strongly disagree</span>` : "") + "<br>" +
+        D.profiles.map((p, k) => `<span style="color:${p.colour};font-weight:600;opacity:${on[k] ? 1 : 0.45}">●</span> Profile ${k + 1}: ${fmt(mean(it, k), block)}`).join("<br>");
+      tip.style.display = "block";
+      tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 400) + "px"; tip.style.top = (e.clientY + 12) + "px";
+    });
+    r.addEventListener("mouseleave", () => tip.style.display = "none");
+  });
+  return div;
+}
+
+function draw() {
+  const P = document.getElementById("blocks"); P.innerHTML = "";
+  D.blocks.forEach(b => P.appendChild(blockPanel(b)));
+}
+window.addEventListener("resize", draw);
+draw();
+</script>
+</body>
+</html>

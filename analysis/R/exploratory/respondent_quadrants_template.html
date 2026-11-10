@@ -78,6 +78,8 @@ those respondents below the map; click without dragging to clear. Hollow grey ri
 <script>
 const D = __DATA__;
 const N = D.w.length;
+// the latent solutions join the split variables: as colours and as panels, grouped by their block
+Object.entries(D.latent || {}).forEach(([k, v]) => D.splits[k] = v);
 const X_AXES = {
   illicit:  { label: "all illicit drugs", drugs: ["cannabis", "psychedelica", "mdma", "speed", "cocaine", "heroine"] },
   soft:     { label: "soft drugs (cannabis, MDMA, psychedelics)", drugs: ["cannabis", "mdma", "psychedelica"] },
@@ -133,8 +135,16 @@ const colourSel = document.getElementById("colour"), splitSel = document.getElem
       scoredBox = document.getElementById("scored");
 function opt(parent, value, text) { const o = document.createElement("option"); o.value = value; o.textContent = text; parent.appendChild(o); }
 opt(colourSel, "none", "No colour");
-const og0 = document.createElement("optgroup"); og0.label = "Split variables"; colourSel.appendChild(og0);
-Object.entries(D.splits).forEach(([k, s]) => opt(og0, "split:" + k, s.label));
+// the split variables and latent solutions, in optgroups by block
+function splitOptions(sel, prefix) {
+  const groups = {};
+  Object.entries(D.splits).forEach(([k, s]) => {
+    const b = s.block || "Split variables";
+    if (!groups[b]) { groups[b] = document.createElement("optgroup"); groups[b].label = b; sel.appendChild(groups[b]); }
+    opt(groups[b], prefix + k, s.label);
+  });
+}
+splitOptions(colourSel, "split:");
 let block = null, og = null;
 D.vars.forEach((v, i) => {
   if (v.block !== block) { block = v.block; og = document.createElement("optgroup"); og.label = block; colourSel.appendChild(og); }
@@ -144,7 +154,7 @@ const xSel = document.getElementById("xaxis"), ySel = document.getElementById("y
 Object.entries(X_AXES).forEach(([k, a]) => opt(xSel, k, a.label[0].toUpperCase() + a.label.slice(1)));
 Object.entries(Y_AXES).forEach(([k, a]) => opt(ySel, k, a.label[0].toUpperCase() + a.label.slice(1)));
 opt(splitSel, "none", "No split");
-Object.entries(D.splits).forEach(([k, s]) => opt(splitSel, k, s.label));
+splitOptions(splitSel, "");
 function cap(s) { return s[0].toUpperCase() + s.slice(1); }
 function short(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
@@ -167,7 +177,7 @@ function colourSpec() {
   if (c === "none") return { colour: () => "#3b528b", value: () => 1, kind: "none" };
   if (c.startsWith("split:")) {
     const s = D.splits[c.slice(6)];
-    return { kind: "cat", groups: s.groups, value: i => s.assign[i],
+    return { kind: "cat", groups: s.groups, prob: s.prob, value: i => s.assign[i],
              colour: i => s.assign[i] == null ? NA_COL : CAT_COL[(s.assign[i] - 1) % CAT_COL.length] };
   }
   const v = D.vars[+c.slice(4)];
@@ -300,7 +310,8 @@ function tipText(i, spec) {
   let s = `${cap(C.xlab)}: <b>${C.x[i].toFixed(2)}</b><br>${cap(C.ylab)}: <b>${C.y[i].toFixed(2)}</b>`;
   const sp = splitSel.value;
   if (sp !== "none") { const S = D.splits[sp]; s += `<br>${S.label}: ${S.assign[i] == null ? "missing" : S.groups[S.assign[i] - 1]}`; }
-  if (spec.kind === "cat") s += `<br>${spec.value(i) == null ? "missing" : spec.groups[spec.value(i) - 1]}`;
+  if (spec.kind === "cat") s += `<br>${spec.value(i) == null ? "missing" : spec.groups[spec.value(i) - 1]}` +
+    (spec.prob && spec.prob[i] != null ? ` <span style="color:#777">(p = ${spec.prob[i].toFixed(2)})</span>` : "");
   else if (spec.kind !== "none") {
     const x = spec.value(i);
     let t = x == null ? "geen mening / missing" : x;

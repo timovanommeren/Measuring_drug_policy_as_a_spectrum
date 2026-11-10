@@ -10,7 +10,8 @@ source(here::here("analysis", "R", "utils", "report_helpers.R"))
 # there, per respondent over the drugs answered, as in utils/party_map_scores.R.
 # In the browser the map can be split into panels by the descriptive report's split variables (plus party),
 # and the points coloured by any attitude item: belief and behaviour items on a 1-7 gradient, emotion boxes
-# ticked or not, involvement on a 0-100 gradient, own use on 1-4. Dragging a box over dots lists those
+# ticked or not, involvement on a 0-100 gradient, own use on 1-4, and the latent class and profile solutions
+# (LCA, LPA) as colours or panels. Dragging a box over dots lists those
 # respondents in a table under the map (demographics, vote, own use, involvement, their nine policy answers),
 # with the group's weighted profile against everyone on the map.
 # The data are inlined into the HTML, so the output stays in analysis/output/ (not tracked) and must not be
@@ -25,6 +26,56 @@ splits <- build_splits(d)
 party <- factor(replace(as.character(d$vote_recall_rec), as.character(d$vote_recall_rec) %in% excluded, NA))
 splits$party <- list(label = "Partij (stemherinnering)", groups = levels(party), assign = as.integer(party))
 splits <- map(splits, \(s) s[c("label", "groups", "assign")])
+
+# the latent class and profile solutions from exploratory/latent/ (lca.R, lpa_profiles.R), read from their saved
+# fits in analysis/output/latent_models/ (run those scripts first; skipped if the fits are missing). Every
+# respondent's modal class, with its posterior probability, as a colour and split option. Each class is labelled
+# with its weighted share and the weighted mean answer (1-9) of its members on the legal, soft and hard drugs
+policy <- \(v) as.numeric(d[[paste0("beleid_voorkeur_", v)]])
+dims <- list(legal = c("alcohol", "tabak_en_vapes"), soft = c("cannabis", "psychedelica", "mdma"),
+             hard = c("cocaine", "speed", "heroine"))
+dim_scores <- map(dims, \(v) { s <- rowMeans(sapply(v, policy), na.rm = TRUE); replace(s, is.nan(s), NA) })
+
+latent_entry <- function(cls, prob, label, block, noun = "Class") {
+  w <- as.numeric(d$w)
+  groups <- map_chr(sort(unique(na.omit(cls))), \(k) {
+    m <- !is.na(cls) & cls == k
+    means <- map_dbl(dim_scores, \(s) weighted.mean(s[m], w[m], na.rm = TRUE))
+    sprintf("%s %d (%.0f%%): legal %.1f, soft %.1f, hard %.1f", noun, k,
+            100 * sum(w[m]) / sum(w[!is.na(cls)]), means[["legal"]], means[["soft"]], means[["hard"]])
+  })
+  list(label = label, block = block, groups = groups, assign = match(cls, sort(unique(na.omit(cls)))),
+       prob = round(prob, 3))
+}
+
+latent <- list()
+lca_file <- here::here("analysis", "output", "latent_models", "lca", "lca_fits.rds")
+if (file.exists(lca_file)) {
+  lca <- read_rds(lca_file)   # poLCA fits for 1-8 classes, one row per respondent of df
+  for (k in 2:8) {
+    f <- lca[[as.character(k)]]
+    stopifnot(length(f$predclass) == nrow(d))
+    latent[[paste0("lca_", k)]] <- latent_entry(f$predclass, apply(f$posterior, 1, max),
+                                                sprintf("LCA: %d classes", k), "Latent classes (LCA, eight drugs)")
+  }
+} else message("no LCA fits at ", lca_file, ": run exploratory/latent/lca.R first")
+
+lpa_file <- here::here("analysis", "output", "latent_models", "lpa", "lpa_fits.rds")
+if (file.exists(lpa_file)) {
+  lpa <- read_rds(lpa_file)   # tidyLPA fits; rows are the respondents with all three indicators, as in lpa_profiles.R
+  in_lpa <- reduce(dim_scores, \(a, b) a & !is.na(b), .init = rep(TRUE, nrow(d)))
+  model_names <- c(`1` = "equal variances", `2` = "varying variances", `6` = "varying variances and covariances")
+  for (m in names(model_names)) for (k in 2:6) {
+    dff <- lpa[[sprintf("model_%s_class_%d", m, k)]]$dff
+    stopifnot(nrow(dff) == sum(in_lpa))
+    cls <- prob <- rep(NA_real_, nrow(d))
+    cls[in_lpa] <- dff$Class
+    prob[in_lpa] <- apply(as.matrix(dff[grep("^CPROB", names(dff))]), 1, max)
+    latent[[sprintf("lpa_%s_%d", m, k)]] <- latent_entry(
+      cls, prob, sprintf("LPA model %s: %d profiles%s", m, k, if (m == "1" && k == 4) " (provisional choice)" else ""),
+      sprintf("Latent profiles (LPA model %s, %s)", m, model_names[[m]]), noun = "Profile")
+  }
+} else message("no LPA fits at ", lpa_file, ": run exploratory/latent/lpa_profiles.R first")
 
 # the respondent table under the map (rows for the dots selected with a box, and their profile against the sample)
 # education and urbanisation at their finest level here (the splits use the 3 and 2 groups): edu_clean's
@@ -79,6 +130,7 @@ data <- list(
   w = as.numeric(d$w),
   jx = runif(nrow(d), -1, 1), jy = runif(nrow(d), -1, 1),  # jitter, scaled in the browser to the axis's step
   splits = splits,
+  latent = latent,
   info = info,
   involvement = as.numeric(d$betrokkenheid_mean),
   vars = colour_vars,

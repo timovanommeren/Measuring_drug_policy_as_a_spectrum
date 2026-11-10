@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Respondents on the quadrant map</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 20px 28px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 12.5px; margin-bottom: 14px; max-width: 1000px; line-height: 1.45; }
+  .controls { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; margin-bottom: 10px; }
+  .controls label { display: flex; flex-direction: column; font-size: 11.5px; color: #555; gap: 3px; }
+  select { font-size: 13px; padding: 4px 6px; max-width: 520px; }
+  .check { flex-direction: row !important; align-items: center; gap: 6px !important; font-size: 12.5px !important; color: #333 !important; }
+  #wording { font-size: 13px; margin: 6px 0 4px; min-height: 18px; max-width: 1000px; }
+  #legend { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: #444; min-height: 24px; flex-wrap: wrap; }
+  .sw { display: inline-flex; align-items: center; gap: 4px; }
+  .sw i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  #panels { display: grid; gap: 6px 14px; margin-top: 6px; }
+  .panel-title { font-size: 12.5px; font-weight: 600; margin: 0 0 0 52px; }
+  .panel-title span { font-weight: 400; color: #777; }
+  svg text { font-family: inherit; }
+  #tip { position: fixed; pointer-events: none; background: rgba(255,255,255,0.97); border: 1px solid #ccc;
+         border-radius: 4px; padding: 6px 8px; font-size: 11.5px; line-height: 1.4; display: none;
+         box-shadow: 0 2px 6px rgba(0,0,0,0.12); max-width: 300px; }
+  .key { font-size: 11px; color: #777; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>Respondents on the quadrant map</h1>
+<div class="sub">Each dot is a respondent: mean preferred policy for the illicit drugs (cannabis, psychedelics, MDMA,
+speed, cocaine, heroin; horizontal) and for alcohol and tobacco (vertical), from ban (1) to free sale (9). Dashed lines
+are the weighted means of all respondents, in every panel; the black cross is the panel's own weighted mean.
+Quadrant shares and the colour summaries are weighted. Dots are jittered slightly, since a mean over six or two answers
+takes few values. Grey dots: "geen mening" on the colour item.</div>
+
+<div class="controls">
+  <label>Colour by<select id="colour"></select></label>
+  <label>Split into panels by<select id="split"></select></label>
+  <label class="check"><input type="checkbox" id="scored"> Belief and behaviour items scored so that 7 = most liberal</label>
+</div>
+<div id="wording"></div>
+<div id="legend"></div>
+<div id="panels"></div>
+<div class="key">Policy options: 1 Ban · 2 Research only · 3 Treatment only · 4 Prescription only · 5 Specialist shop, non-profit ·
+6 Specialist shop, for-profit · 7 Sold everywhere, no advertising · 8 Sold everywhere, with advertising · 9 Free sale</div>
+<div id="tip"></div>
+
+<script>
+const D = __DATA__;
+const N = D.x.length;
+const NS = "http://www.w3.org/2000/svg";
+
+const QUAD = [
+  { right: false, top: true,  name: "Double standards", col: "#9c6b00" },
+  { right: true,  top: true,  name: "Liberals",         col: "#00664a" },
+  { right: false, top: false, name: "Abstainers",       col: "#2b7aa8" },
+  { right: true,  top: false, name: "Reformers",        col: "#8f4a76" }
+];
+const OPTIONS = ["Ban", "Research only", "Treatment only", "Prescription only", "Shop, non-profit",
+                 "Shop, for-profit", "Everywhere, no ads", "Everywhere, ads", "Free sale"];
+const LIKERT = ["Helemaal mee oneens", "Mee oneens", "Enigszins mee oneens", "Neutraal", "Enigszins mee eens",
+                "Mee eens", "Helemaal mee eens"];
+const LIKERT_COL = ["#8c510a", "#bf812d", "#dfc27d", "#b5b5b5", "#80cdc1", "#35978f", "#01665e"];
+const USE_COL = ["#d9d9d9", "#9ecae1", "#4292c6", "#08306b"];
+const CAT_COL = ["#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#0072B2", "#D55E00", "#F0E442", "#000000",
+                 "#999999", "#8B4513", "#6A3D9A", "#B2DF8A", "#FB9A99", "#1F78B4", "#33A02C"];
+const VIRIDIS = ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"];
+const NA_COL = "#cfcfcf";
+
+// ---- controls ----
+const colourSel = document.getElementById("colour"), splitSel = document.getElementById("split"),
+      scoredBox = document.getElementById("scored");
+function opt(parent, value, text) { const o = document.createElement("option"); o.value = value; o.textContent = text; parent.appendChild(o); }
+opt(colourSel, "none", "No colour");
+const og0 = document.createElement("optgroup"); og0.label = "Split variables"; colourSel.appendChild(og0);
+Object.entries(D.splits).forEach(([k, s]) => opt(og0, "split:" + k, s.label));
+let block = null, og = null;
+D.vars.forEach((v, i) => {
+  if (v.block !== block) { block = v.block; og = document.createElement("optgroup"); og.label = block; colourSel.appendChild(og); }
+  opt(og, "var:" + i, short(v.label, 90));
+});
+opt(splitSel, "none", "No split");
+Object.entries(D.splits).forEach(([k, s]) => opt(splitSel, k, s.label));
+function short(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+[colourSel, splitSel, scoredBox].forEach(el => el.addEventListener("change", draw));
+
+// ---- colour scales ----
+function lerp(a, b, t) {
+  const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const A = p(a), B = p(b);
+  return "#" + A.map((x, i) => Math.round(x + (B[i] - x) * t).toString(16).padStart(2, "0")).join("");
+}
+function viridis(v) {
+  const t = Math.max(0, Math.min(1, v / 100)) * (VIRIDIS.length - 1), i = Math.min(Math.floor(t), VIRIDIS.length - 2);
+  return lerp(VIRIDIS[i], VIRIDIS[i + 1], t - i);
+}
+
+// returns { value(i), colour(i), kind, legend, summary(idx) }
+function colourSpec() {
+  const c = colourSel.value;
+  if (c === "none") return { colour: () => "#3b528b", value: () => 1, kind: "none" };
+  if (c.startsWith("split:")) {
+    const s = D.splits[c.slice(6)];
+    return { kind: "cat", groups: s.groups, value: i => s.assign[i],
+             colour: i => s.assign[i] == null ? NA_COL : CAT_COL[(s.assign[i] - 1) % CAT_COL.length] };
+  }
+  const v = D.vars[+c.slice(4)];
+  const flip = scoredBox.checked && v.anti;
+  const val = i => { const x = v.values[i]; return x == null ? null : (flip ? 8 - x : x); };
+  if (v.type === "likert") return { kind: "likert", v, flip, value: val, colour: i => val(i) == null ? NA_COL : LIKERT_COL[val(i) - 1] };
+  if (v.type === "binary") return { kind: "binary", v, value: val, colour: i => val(i) == null ? NA_COL : (val(i) === 1 ? "#d95f02" : "#c8c8c8") };
+  if (v.type === "slider") return { kind: "slider", v, value: val, colour: i => val(i) == null ? NA_COL : viridis(val(i)) };
+  return { kind: "use", v, value: val, colour: i => val(i) == null ? NA_COL : USE_COL[val(i) - 1] };
+}
+
+// weighted summary of the colour variable among the respondents idx
+function summarise(spec, idx) {
+  let sw = 0, sv = 0;
+  if (spec.kind === "none" || spec.kind === "cat") return "";
+  idx.forEach(i => { const x = spec.value(i); if (x != null) { sw += D.w[i]; sv += D.w[i] * x; } });
+  if (!sw) return "";
+  if (spec.kind === "binary") return Math.round(100 * sv / sw) + "% ticked";
+  return "mean " + (sv / sw).toFixed(spec.kind === "slider" ? 0 : 1);
+}
+
+function drawLegend(spec) {
+  const L = document.getElementById("legend"), W = document.getElementById("wording");
+  L.innerHTML = ""; W.textContent = "";
+  const sw = (col, txt) => { const s = document.createElement("span"); s.className = "sw"; s.innerHTML = `<i style="background:${col}"></i>${txt}`; L.appendChild(s); };
+  if (spec.kind === "none") return;
+  if (spec.kind === "cat") { spec.groups.forEach((g, k) => sw(CAT_COL[k % CAT_COL.length], g)); sw(NA_COL, "missing"); return; }
+  W.innerHTML = "<b>" + spec.v.label + "</b>" + (spec.v.anti ? (spec.flip ? " <span style='color:#888'>(reversed: 7 = strongly disagree)</span>" : " <span style='color:#888'>(agreeing favours prohibition)</span>") : "");
+  if (spec.kind === "likert") {
+    const labs = spec.flip ? LIKERT.slice().reverse() : LIKERT;
+    LIKERT_COL.forEach((c, k) => sw(c, (k + 1) + " " + labs[k]));
+  } else if (spec.kind === "binary") { sw("#d95f02", "ticked"); sw("#c8c8c8", "not ticked"); return; }
+  else if (spec.kind === "slider") {
+    const g = document.createElement("span");
+    g.style.cssText = `display:inline-block;width:220px;height:11px;border-radius:2px;background:linear-gradient(to right,${VIRIDIS.join(",")})`;
+    L.append("0", g, "100");
+  } else D.use_labels.forEach((t, k) => sw(USE_COL[k], (k + 1) + " " + t));
+  sw(NA_COL, "geen mening / missing");
+}
+
+// ---- drawing ----
+const tip = document.getElementById("tip");
+function el(name, attrs, parent) { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+
+function panel(idx, title, spec, single) {
+  const W = single ? 820 : 400, H = single ? 640 : 340;
+  const m = single ? { l: 150, r: 14, t: 10, b: 96 } : { l: 52, r: 10, t: 6, b: 34 };
+  const lo = 0.6, hi = 9.4;
+  const sx = v => m.l + (v - lo) / (hi - lo) * (W - m.l - m.r);
+  const sy = v => H - m.b - (v - lo) / (hi - lo) * (H - m.t - m.b);
+  const box = document.createElement("div");
+  if (title) { const t = document.createElement("div"); t.className = "panel-title"; t.innerHTML = title; box.appendChild(t); }
+  const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, box);
+
+  // grid and ticks
+  for (let k = 1; k <= 9; k++) {
+    el("line", { x1: sx(k), x2: sx(k), y1: sy(lo), y2: sy(hi), stroke: "#eee" }, svg);
+    el("line", { y1: sy(k), y2: sy(k), x1: sx(lo), x2: sx(hi), stroke: "#eee" }, svg);
+    const tx = el("text", single ? { x: sx(k), y: sy(lo) + 12, "font-size": 10.5, fill: "#555", "text-anchor": "end",
+                  transform: `rotate(-35 ${sx(k)} ${sy(lo) + 12})` } : { x: sx(k), y: sy(lo) + 13, "font-size": 10, fill: "#555", "text-anchor": "middle" }, svg);
+    tx.textContent = single ? OPTIONS[k - 1] + " (" + k + ")" : k;
+    const ty = el("text", { x: m.l - 6, y: sy(k) + 3.5, "font-size": single ? 10.5 : 10, fill: "#555", "text-anchor": "end" }, svg);
+    ty.textContent = single ? OPTIONS[k - 1] + " (" + k + ")" : k;
+  }
+  const ax = el("text", { x: (sx(lo) + sx(hi)) / 2, y: H - 4, "font-size": 11.5, fill: "#333", "text-anchor": "middle" }, svg);
+  ax.textContent = "Mean preferred policy: illicit drugs";
+  const ay = el("text", { x: 12, y: (sy(lo) + sy(hi)) / 2, "font-size": 11.5, fill: "#333", "text-anchor": "middle",
+                          transform: `rotate(-90 12 ${(sy(lo) + sy(hi)) / 2})` }, svg);
+  ay.textContent = "Mean preferred policy: alcohol and tobacco";
+
+  // means
+  el("line", { x1: sx(D.means.x), x2: sx(D.means.x), y1: sy(lo), y2: sy(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
+  el("line", { y1: sy(D.means.y), y2: sy(D.means.y), x1: sx(lo), x2: sx(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
+
+  // points: missing first, so the coloured ones sit on top
+  const order = idx.slice().sort((a, b) => (spec.value(a) == null) - (spec.value(b) == null)).reverse();
+  const r = single ? 2.8 : 2.1;
+  const g = el("g", {}, svg);
+  order.forEach(i => {
+    const missing = spec.value(i) == null;
+    el("circle", { cx: sx(D.x[i] + D.jx[i]), cy: sy(D.y[i] + D.jy[i]), r, fill: spec.colour(i),
+                   "fill-opacity": missing ? 0.45 : (spec.kind === "binary" && spec.value(i) === 0 ? 0.4 : 0.7), "data-i": i }, g);
+  });
+  g.addEventListener("mousemove", e => {
+    const i = e.target.getAttribute && e.target.getAttribute("data-i");
+    if (i == null) { tip.style.display = "none"; return; }
+    tip.innerHTML = tipText(+i, spec);
+    tip.style.display = "block"; tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 10) + "px";
+  });
+  g.addEventListener("mouseleave", () => tip.style.display = "none");
+
+  // group mean
+  let sw = 0, mx = 0, my = 0;
+  idx.forEach(i => { sw += D.w[i]; mx += D.w[i] * D.x[i]; my += D.w[i] * D.y[i]; });
+  if (sw) {
+    const cx = sx(mx / sw), cy = sy(my / sw), s = single ? 7 : 5.5;
+    el("path", { d: `M${cx - s},${cy}H${cx + s}M${cx},${cy - s}V${cy + s}`, stroke: "#fff", "stroke-width": 4.5 }, svg);
+    el("path", { d: `M${cx - s},${cy}H${cx + s}M${cx},${cy - s}V${cy + s}`, stroke: "#000", "stroke-width": 2 }, svg);
+  }
+
+  // quadrant labels: weighted share and colour summary
+  QUAD.forEach(q => {
+    const inq = idx.filter(i => (D.x[i] > D.means.x) === q.right && (D.y[i] > D.means.y) === q.top);
+    const share = sw ? inq.reduce((a, i) => a + D.w[i], 0) / sw : 0;
+    const x = q.right ? sx(hi) - 5 : sx(lo) + 5, y = q.top ? sy(hi) + (single ? 15 : 12) : sy(lo) - (single ? 20 : 16);
+    const anchor = q.right ? "end" : "start", fs = single ? 12 : 10.5;
+    const halo = { stroke: "#fff", "stroke-width": 3, "paint-order": "stroke" };
+    const t1 = el("text", Object.assign({ x, y, "font-size": fs, "font-weight": 700, fill: q.col, "text-anchor": anchor }, halo), svg);
+    t1.textContent = `${q.name}: ${Math.round(100 * share)}%`;
+    const sm = summarise(spec, inq);
+    if (sm) { const t2 = el("text", Object.assign({ x, y: y + fs + 1, "font-size": fs - 1, fill: q.col, "text-anchor": anchor }, halo), svg); t2.textContent = sm; }
+  });
+  return box;
+}
+
+function tipText(i, spec) {
+  let s = `Illicit drugs: <b>${D.x[i].toFixed(2)}</b><br>Alcohol and tobacco: <b>${D.y[i].toFixed(2)}</b>`;
+  const sp = splitSel.value;
+  if (sp !== "none") { const S = D.splits[sp]; s += `<br>${S.label}: ${S.assign[i] == null ? "missing" : S.groups[S.assign[i] - 1]}`; }
+  if (spec.kind === "cat") s += `<br>${spec.value(i) == null ? "missing" : spec.groups[spec.value(i) - 1]}`;
+  else if (spec.kind !== "none") {
+    const x = spec.value(i);
+    let t = x == null ? "geen mening / missing" : x;
+    if (x != null && spec.kind === "likert") t = x + " (" + (spec.flip ? LIKERT[7 - x] : LIKERT[x - 1]) + ")";
+    if (x != null && spec.kind === "binary") t = x === 1 ? "ticked" : "not ticked";
+    if (x != null && spec.kind === "use") t = x + " (" + D.use_labels[x - 1] + ")";
+    if (x != null && spec.kind === "slider") t = Math.round(x);
+    s += `<br>${short(spec.v.label, 60)}: <b>${t}</b>`;
+  }
+  return s;
+}
+
+function draw() {
+  const spec = colourSpec();
+  drawLegend(spec);
+  const P = document.getElementById("panels"); P.innerHTML = "";
+  const all = [...Array(N).keys()];
+  const sp = splitSel.value;
+  if (sp === "none") {
+    P.style.gridTemplateColumns = "auto";
+    P.appendChild(panel(all, `All respondents <span>(n = ${N})</span>`, spec, true));
+    return;
+  }
+  const S = D.splits[sp];
+  const nPanels = S.groups.length + (S.assign.some(a => a == null) ? 1 : 0);
+  P.style.gridTemplateColumns = `repeat(${nPanels === 4 ? 2 : Math.min(3, nPanels)}, auto)`;
+  S.groups.forEach((gname, k) => {
+    const idx = all.filter(i => S.assign[i] === k + 1);
+    P.appendChild(panel(idx, `${gname} <span>(n = ${idx.length})</span>`, spec, false));
+  });
+  const miss = all.filter(i => S.assign[i] == null);
+  if (miss.length) P.appendChild(panel(miss, `Missing <span>(n = ${miss.length})</span>`, spec, false));
+}
+draw();
+</script>
+</body>
+</html>

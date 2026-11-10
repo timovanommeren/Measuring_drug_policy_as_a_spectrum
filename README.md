@@ -98,6 +98,8 @@ variables derived, for the paper, the exploratory scripts and the descriptive re
 |---|---|---|
 | `raw_distributions.R` | Raw answer distributions per drug × demographic, per party, by involvement, and the belief items per party | |
 | `party_map_variants.R` | Variants of the party map: other drug pairs, medians, modes, support for the middle options | |
+| `respondent_quadrants.R` | Figure 4a with respondents instead of parties: every respondent on the illicit × legal map, dashed lines at the weighted means, weighted quadrant shares | |
+| `respondent_quadrants_interactive.R` | Interactive version (HTML): split into panels by the descriptive report's splits or party, colour by any attitude item, involvement slider or own use. Fills `respondent_quadrants_template.html` with the data; the HTML contains respondent-level data, so it is written to `analysis/output/` and never committed or shared | `jsonlite` |
 | `factor_model.R` | Ordinal factor models: does a licit factor separate from an illicit factor at the respondent level? | `lavaan`, `semPlot` |
 | `latent/lca.R`, `latent/lpa_profiles.R` | Latent class and latent profile analyses of the policy preferences | `poLCA`, `tidyLPA`, `mclust` |
 | `modality/` | How many camps (modes) a party's answers have, per drug: hand-rating apps, models and camp maps (see below) | `shiny`, `nnet`, `marginaleffects`, `mclust`, `remode`, `irr`, `ggrepel` |

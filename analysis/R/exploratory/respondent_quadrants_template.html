@@ -383,7 +383,7 @@ function renderSelection(spec) {
     <td>${lab(I.urb, i)}</td><td>${lab(I.prov, i)}</td><td>${lab(I.vote, i)}</td><td>${lab(I.use, i)}</td>
     <td style="text-align:right">${D.involvement[i] == null ? "–" : Math.round(D.involvement[i])}</td><td>${strip(i)}</td>
     ${colourCol ? `<td style="text-align:center">${val(i)}</td>` : ""}</tr>`).join("");
-  const head = `<tr><th>Sex</th><th>Age</th><th>Education</th><th title="Address density, addresses per km2">Urbanisation</th><th>Province</th><th>Vote</th><th>Own use</th>
+  const head = `<tr><th>Sex</th><th>Age</th><th>Education</th><th>Urbanisation</th><th>Province</th><th>Vote</th><th>Own use</th>
     <th>Involv.</th><th><span class="strip">${POLICY_DRUGS.map(([, l]) => `<b style="font-weight:600;font-size:9.5px">${l}</b>`).join("")}</span></th>
     ${colourCol ? `<th title="${esc(spec.v.label)}">Colour item</th>` : ""}</tr>`;
 

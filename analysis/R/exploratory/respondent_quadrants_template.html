@@ -19,6 +19,12 @@
   #panels { display: grid; gap: 6px 14px; margin-top: 6px; }
   .panel-title { font-size: 12.5px; font-weight: 600; margin: 0 0 0 52px; }
   .panel-title span { font-weight: 400; color: #777; }
+  .qgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; font-size: 10.5px; line-height: 1.35; margin: 2px 0 2px; }
+  .qgrid.single { font-size: 12px; }
+  .qgrid div { white-space: nowrap; }
+  .qgrid span { opacity: 0.85; }
+  .qgrid:not(.single) span { display: block; }
+  .qgrid:not(.single) span i { display: none; }
   svg text { font-family: inherit; }
   #tip { position: fixed; pointer-events: none; background: rgba(255,255,255,0.97); border: 1px solid #ccc;
          border-radius: 4px; padding: 6px 8px; font-size: 11.5px; line-height: 1.4; display: none;
@@ -245,18 +251,21 @@ function panel(idx, title, spec, single) {
     el("path", { d: `M${cx - s},${cy}H${cx + s}M${cx},${cy - s}V${cy + s}`, stroke: "#000", "stroke-width": 2 }, svg);
   }
 
-  // quadrant labels: weighted share and colour summary
+  // quadrant labels above the plot, in a 2 x 2 grid laid out like the quadrants, so they cover no dots:
+  // weighted share and colour summary
+  const qg = document.createElement("div");
+  qg.className = "qgrid" + (single ? " single" : "");
+  qg.style.marginLeft = m.l + "px"; qg.style.width = (W - m.l - m.r) + "px";
   QUAD.forEach(q => {
     const inq = idx.filter(i => (C.x[i] > C.mx) === q.right && (C.y[i] > C.my) === q.top);
     const share = sw ? inq.reduce((a, i) => a + D.w[i], 0) / sw : 0;
-    const x = q.right ? sx(hi) - 5 : sx(lo) + 5, y = q.top ? sy(hi) + (single ? 15 : 12) : sy(lo) - (single ? 20 : 16);
-    const anchor = q.right ? "end" : "start", fs = single ? 12 : 10.5;
-    const halo = { stroke: "#fff", "stroke-width": 3, "paint-order": "stroke" };
-    const t1 = el("text", Object.assign({ x, y, "font-size": fs, "font-weight": 700, fill: q.col, "text-anchor": anchor }, halo), svg);
-    t1.textContent = `${q.name}: ${Math.round(100 * share)}%`;
     const sm = summarise(spec, inq);
-    if (sm) { const t2 = el("text", Object.assign({ x, y: y + fs + 1, "font-size": fs - 1, fill: q.col, "text-anchor": anchor }, halo), svg); t2.textContent = sm; }
+    const cell = document.createElement("div");
+    cell.style.textAlign = q.right ? "right" : "left"; cell.style.color = q.col;
+    cell.innerHTML = `<b>${q.name}: ${Math.round(100 * share)}%</b>${sm ? ` <span><i>· </i>${sm}</span>` : ""}`;
+    qg.appendChild(cell);
   });
+  box.insertBefore(qg, svg);
   return box;
 }
 

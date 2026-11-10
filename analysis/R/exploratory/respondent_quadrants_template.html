@@ -14,7 +14,8 @@
   #wording { font-size: 13px; margin: 6px 0 4px; min-height: 18px; max-width: 1000px; }
   #legend { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: #444; min-height: 24px; flex-wrap: wrap; }
   .sw { display: inline-flex; align-items: center; gap: 4px; }
-  .sw i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .sw i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; box-sizing: border-box; }
+  .sw i.ring { background: none !important; border: 1.5px solid #9a9a9a; }
   #panels { display: grid; gap: 6px 14px; margin-top: 6px; }
   .panel-title { font-size: 12.5px; font-weight: 600; margin: 0 0 0 52px; }
   .panel-title span { font-weight: 400; color: #777; }
@@ -31,7 +32,7 @@
 from ban (1) to free sale (9). Respondents with no answer for either axis are left out. Dashed lines
 are the weighted means of all respondents on the map, in every panel; the black cross is the panel's own weighted mean.
 Quadrant shares and the colour summaries are weighted. Dots are jittered slightly, since a mean over six or two answers
-takes few values; the jitter shrinks as the axis averages over more drugs. Grey dots: "geen mening" on the colour item.</div>
+takes few values; the jitter shrinks as the axis averages over more drugs. Hollow grey rings: "geen mening" on the colour item.</div>
 
 <div class="controls">
   <label>Horizontal axis<select id="xaxis"></select></label>
@@ -91,7 +92,9 @@ const OPTIONS = ["Ban", "Research only", "Treatment only", "Prescription only", 
                  "Shop, for-profit", "Everywhere, no ads", "Everywhere, ads", "Free sale"];
 const LIKERT = ["Helemaal mee oneens", "Mee oneens", "Enigszins mee oneens", "Neutraal", "Enigszins mee eens",
                 "Mee eens", "Helemaal mee eens"];
-const LIKERT_COL = ["#8c510a", "#bf812d", "#dfc27d", "#b5b5b5", "#80cdc1", "#35978f", "#01665e"];
+// light to dark blue, every dot equally opaque (lightness, not transparency, so overlapping dots do not darken);
+// 1 is kept pale but visible on white
+const LIKERT_COL = ["#d4e4f4", "#a9cbe6", "#7cb0d8", "#5093c7", "#2b74b3", "#11559a", "#08306b"];
 const USE_COL = ["#d9d9d9", "#9ecae1", "#4292c6", "#08306b"];
 const CAT_COL = ["#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#0072B2", "#D55E00", "#F0E442", "#000000",
                  "#999999", "#8B4513", "#6A3D9A", "#B2DF8A", "#FB9A99", "#1F78B4", "#33A02C"];
@@ -162,7 +165,7 @@ function summarise(spec, idx) {
 function drawLegend(spec) {
   const L = document.getElementById("legend"), W = document.getElementById("wording");
   L.innerHTML = ""; W.textContent = "";
-  const sw = (col, txt) => { const s = document.createElement("span"); s.className = "sw"; s.innerHTML = `<i style="background:${col}"></i>${txt}`; L.appendChild(s); };
+  const sw = (col, txt) => { const s = document.createElement("span"); s.className = "sw"; s.innerHTML = `<i${col === NA_COL ? ' class="ring"' : ""} style="background:${col}"></i>${txt}`; L.appendChild(s); };
   if (spec.kind === "none") return;
   if (spec.kind === "cat") { spec.groups.forEach((g, k) => sw(CAT_COL[k % CAT_COL.length], g)); sw(NA_COL, "missing"); return; }
   W.innerHTML = "<b>" + spec.v.label + "</b>" + (spec.v.anti ? (spec.flip ? " <span style='color:#888'>(reversed: 7 = strongly disagree)</span>" : " <span style='color:#888'>(agreeing favours prohibition)</span>") : "");
@@ -212,14 +215,17 @@ function panel(idx, title, spec, single) {
   el("line", { x1: sx(C.mx), x2: sx(C.mx), y1: sy(lo), y2: sy(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
   el("line", { y1: sy(C.my), y2: sy(C.my), x1: sx(lo), x2: sx(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
 
-  // points: missing first, so the coloured ones sit on top
-  const order = idx.slice().sort((a, b) => (spec.value(a) == null) - (spec.value(b) == null)).reverse();
+  // points: missing first, so the coloured ones sit on top; Likert answers low to high, so the dark 7s are on top
+  const rank = i => spec.value(i) == null ? -1 : (spec.kind === "likert" ? spec.value(i) : 0);
+  const order = idx.slice().sort((a, b) => rank(a) - rank(b));
   const r = single ? 2.8 : 2.1;
   const g = el("g", {}, svg);
   order.forEach(i => {
     const missing = spec.value(i) == null;
-    el("circle", { cx: sx(C.x[i] + C.jx * D.jx[i]), cy: sy(C.y[i] + C.jy * D.jy[i]), r, fill: spec.colour(i),
-                   "fill-opacity": missing ? 0.45 : (spec.kind === "binary" && spec.value(i) === 0 ? 0.4 : 0.7), "data-i": i }, g);
+    // "geen mening" / missing: a hollow grey ring, so it cannot be read as a pale colour
+    el("circle", Object.assign({ cx: sx(C.x[i] + C.jx * D.jx[i]), cy: sy(C.y[i] + C.jy * D.jy[i]), r, "data-i": i },
+       missing ? { fill: "#fff", "fill-opacity": 0, stroke: "#9a9a9a", "stroke-width": 0.8, "stroke-opacity": 0.8 }
+               : { fill: spec.colour(i), "fill-opacity": spec.kind === "likert" ? 0.9 : (spec.kind === "binary" && spec.value(i) === 0 ? 0.4 : 0.7) }), g);
   });
   g.addEventListener("mousemove", e => {
     const i = e.target.getAttribute && e.target.getAttribute("data-i");

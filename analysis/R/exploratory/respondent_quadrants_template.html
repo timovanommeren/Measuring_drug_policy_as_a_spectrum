@@ -92,9 +92,9 @@ const OPTIONS = ["Ban", "Research only", "Treatment only", "Prescription only", 
                  "Shop, for-profit", "Everywhere, no ads", "Everywhere, ads", "Free sale"];
 const LIKERT = ["Helemaal mee oneens", "Mee oneens", "Enigszins mee oneens", "Neutraal", "Enigszins mee eens",
                 "Mee eens", "Helemaal mee eens"];
-// light to dark blue, every dot equally opaque (lightness, not transparency, so overlapping dots do not darken);
-// 1 is kept pale but visible on white
-const LIKERT_COL = ["#d4e4f4", "#a9cbe6", "#7cb0d8", "#5093c7", "#2b74b3", "#11559a", "#08306b"];
+// diverging red (disagree) to blue (agree), darker = more extreme, neutral 4 light grey; every dot equally
+// opaque (lightness, not transparency, so overlapping dots do not darken)
+const LIKERT_COL = ["#b2182b", "#d6604d", "#f4a582", "#bdbdbd", "#92c5de", "#4393c3", "#2166ac"];
 const USE_COL = ["#d9d9d9", "#9ecae1", "#4292c6", "#08306b"];
 const CAT_COL = ["#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#0072B2", "#D55E00", "#F0E442", "#000000",
                  "#999999", "#8B4513", "#6A3D9A", "#B2DF8A", "#FB9A99", "#1F78B4", "#33A02C"];
@@ -215,8 +215,9 @@ function panel(idx, title, spec, single) {
   el("line", { x1: sx(C.mx), x2: sx(C.mx), y1: sy(lo), y2: sy(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
   el("line", { y1: sy(C.my), y2: sy(C.my), x1: sx(lo), x2: sx(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
 
-  // points: missing first, so the coloured ones sit on top; Likert answers low to high, so the dark 7s are on top
-  const rank = i => spec.value(i) == null ? -1 : (spec.kind === "likert" ? spec.value(i) : 0);
+  // points: missing first, so the coloured ones sit on top; Likert answers neutral to extreme, so the dark
+  // 1s and 7s are on top
+  const rank = i => spec.value(i) == null ? -1 : (spec.kind === "likert" ? Math.abs(spec.value(i) - 4) : 0);
   const order = idx.slice().sort((a, b) => rank(a) - rank(b));
   const r = single ? 2.8 : 2.1;
   const g = el("g", {}, svg);

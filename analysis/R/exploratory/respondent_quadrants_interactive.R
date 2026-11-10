@@ -1,21 +1,22 @@
 library(tidyverse)
 
 source(here::here("analysis", "R", "00_load_and_clean.R"))
-source(here::here("analysis", "R", "utils", "party_map_scores.R"))
 source(here::here("analysis", "R", "utils", "report_helpers.R"))
 
-# Interactive version of respondent_quadrants.R: every respondent by mean preferred policy for the illicit
-# drugs (x) and for alcohol and tobacco (y), with dashed lines at the weighted means of all respondents.
+# Interactive version of respondent_quadrants.R: every respondent by mean preferred policy (1 = ban ... 9 = free
+# sale) over a set of drugs on each axis, with dashed lines at the weighted means of all respondents. The axes
+# are chosen in the browser: x cannabis, MDMA, soft drugs (cannabis, MDMA, psychedelics), hard drugs (cocaine,
+# speed, heroin) or all illicit drugs; y alcohol, tobacco or both. Scores, means and quadrants are computed
+# there, per respondent over the drugs answered, as in utils/party_map_scores.R.
 # In the browser the map can be split into panels by the descriptive report's split variables (plus party),
 # and the points coloured by any attitude item: belief and behaviour items on a 1-7 gradient, emotion boxes
 # ticked or not, involvement on a 0-100 gradient, own use on 1-4.
 # The data are inlined into the HTML, so the output stays in analysis/output/ (not tracked) and must not be
 # shared or published. Output: analysis/output/respondent_quadrants_interactive.html
 
-# the respondents with both scores, in the same order as `scores`
-both <- !is.na(block_mean(answers, x_drugs)) & !is.na(block_mean(answers, y_drugs))
-d <- df[both, ]
-stopifnot(nrow(d) == nrow(scores))
+d <- df
+excluded <- c("Niet-stemmers", "Blanco", "Mocht (nog) niet stemmen", "DENK", "Anders")  # as in the party map
+drugs <- c("alcohol", "tabak_en_vapes", "cannabis", "psychedelica", "mdma", "cocaine", "speed", "heroine")
 
 # the report's split buttons, plus party (every party on the party map; DENK, Anders, blank, non-voters NA)
 splits <- build_splits(d)
@@ -48,9 +49,9 @@ colour_vars <- c(
 
 set.seed(1)
 data <- list(
-  x = scores$x, y = scores$y, w = scores$w,
-  jx = runif(nrow(d), -0.07, 0.07), jy = runif(nrow(d), -0.15, 0.15),  # x steps of 1/6, y of 1/2
-  means = list(x = weighted.mean(scores$x, scores$w), y = weighted.mean(scores$y, scores$w)),
+  answers = map(set_names(drugs), \(v) as.numeric(d[[paste0("beleid_voorkeur_", v)]])),
+  w = as.numeric(d$w),
+  jx = runif(nrow(d), -1, 1), jy = runif(nrow(d), -1, 1),  # jitter, scaled in the browser to the axis's step
   splits = splits,
   vars = colour_vars,
   use_labels = names(attr(d$gebruik_1, "labels"))[1:4]

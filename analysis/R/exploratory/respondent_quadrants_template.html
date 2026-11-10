@@ -27,13 +27,15 @@
 </head>
 <body>
 <h1>Respondents on the quadrant map</h1>
-<div class="sub">Each dot is a respondent: mean preferred policy for the illicit drugs (cannabis, psychedelics, MDMA,
-speed, cocaine, heroin; horizontal) and for alcohol and tobacco (vertical), from ban (1) to free sale (9). Dashed lines
-are the weighted means of all respondents, in every panel; the black cross is the panel's own weighted mean.
+<div class="sub">Each dot is a respondent: mean preferred policy over the drugs on each axis (over the drugs answered),
+from ban (1) to free sale (9). Respondents with no answer for either axis are left out. Dashed lines
+are the weighted means of all respondents on the map, in every panel; the black cross is the panel's own weighted mean.
 Quadrant shares and the colour summaries are weighted. Dots are jittered slightly, since a mean over six or two answers
-takes few values. Grey dots: "geen mening" on the colour item.</div>
+takes few values; the jitter shrinks as the axis averages over more drugs. Grey dots: "geen mening" on the colour item.</div>
 
 <div class="controls">
+  <label>Horizontal axis<select id="xaxis"></select></label>
+  <label>Vertical axis<select id="yaxis"></select></label>
   <label>Colour by<select id="colour"></select></label>
   <label>Split into panels by<select id="split"></select></label>
   <label class="check"><input type="checkbox" id="scored"> Belief and behaviour items scored so that 7 = most liberal</label>
@@ -47,7 +49,36 @@ takes few values. Grey dots: "geen mening" on the colour item.</div>
 
 <script>
 const D = __DATA__;
-const N = D.x.length;
+const N = D.w.length;
+const X_AXES = {
+  illicit:  { label: "all illicit drugs", drugs: ["cannabis", "psychedelica", "mdma", "speed", "cocaine", "heroine"] },
+  soft:     { label: "soft drugs (cannabis, MDMA, psychedelics)", drugs: ["cannabis", "mdma", "psychedelica"] },
+  hard:     { label: "hard drugs (cocaine, speed, heroin)", drugs: ["cocaine", "speed", "heroine"] },
+  cannabis: { label: "cannabis", drugs: ["cannabis"] },
+  mdma:     { label: "MDMA", drugs: ["mdma"] }
+};
+const Y_AXES = {
+  both:    { label: "alcohol and tobacco", drugs: ["alcohol", "tabak_en_vapes"] },
+  alcohol: { label: "alcohol", drugs: ["alcohol"] },
+  tobacco: { label: "tobacco and vapes", drugs: ["tabak_en_vapes"] }
+};
+// the current axes: per respondent the mean answer over the axis's drugs answered (null if none), the
+// respondents with both, the weighted means, and the jitter half-width (a mean over k answers moves in steps of 1/k)
+let C;
+function axisScores() {
+  const ax = X_AXES[xSel.value], ay = Y_AXES[ySel.value];
+  const score = drugs => [...Array(N).keys()].map(i => {
+    const a = drugs.map(d => D.answers[d][i]).filter(v => v != null);
+    return a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+  });
+  const x = score(ax.drugs), y = score(ay.drugs);
+  const valid = [...Array(N).keys()].filter(i => x[i] != null && y[i] != null);
+  let sw = 0, mx = 0, my = 0;
+  valid.forEach(i => { sw += D.w[i]; mx += D.w[i] * x[i]; my += D.w[i] * y[i]; });
+  const jit = k => Math.min(0.2, 0.42 / k);
+  C = { x, y, valid, mx: mx / sw, my: my / sw, jx: jit(ax.drugs.length), jy: jit(ay.drugs.length),
+        xlab: ax.label, ylab: ay.label };
+}
 const NS = "http://www.w3.org/2000/svg";
 
 const QUAD = [
@@ -79,11 +110,15 @@ D.vars.forEach((v, i) => {
   if (v.block !== block) { block = v.block; og = document.createElement("optgroup"); og.label = block; colourSel.appendChild(og); }
   opt(og, "var:" + i, short(v.label, 90));
 });
+const xSel = document.getElementById("xaxis"), ySel = document.getElementById("yaxis");
+Object.entries(X_AXES).forEach(([k, a]) => opt(xSel, k, a.label[0].toUpperCase() + a.label.slice(1)));
+Object.entries(Y_AXES).forEach(([k, a]) => opt(ySel, k, a.label[0].toUpperCase() + a.label.slice(1)));
 opt(splitSel, "none", "No split");
 Object.entries(D.splits).forEach(([k, s]) => opt(splitSel, k, s.label));
+function cap(s) { return s[0].toUpperCase() + s.slice(1); }
 function short(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
-[colourSel, splitSel, scoredBox].forEach(el => el.addEventListener("change", draw));
+[xSel, ySel, colourSel, splitSel, scoredBox].forEach(el => el.addEventListener("change", draw));
 
 // ---- colour scales ----
 function lerp(a, b, t) {
@@ -168,14 +203,14 @@ function panel(idx, title, spec, single) {
     ty.textContent = single ? OPTIONS[k - 1] + " (" + k + ")" : k;
   }
   const ax = el("text", { x: (sx(lo) + sx(hi)) / 2, y: H - 4, "font-size": 11.5, fill: "#333", "text-anchor": "middle" }, svg);
-  ax.textContent = "Mean preferred policy: illicit drugs";
+  ax.textContent = "Mean preferred policy: " + C.xlab;
   const ay = el("text", { x: 12, y: (sy(lo) + sy(hi)) / 2, "font-size": 11.5, fill: "#333", "text-anchor": "middle",
                           transform: `rotate(-90 12 ${(sy(lo) + sy(hi)) / 2})` }, svg);
-  ay.textContent = "Mean preferred policy: alcohol and tobacco";
+  ay.textContent = "Mean preferred policy: " + C.ylab;
 
   // means
-  el("line", { x1: sx(D.means.x), x2: sx(D.means.x), y1: sy(lo), y2: sy(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
-  el("line", { y1: sy(D.means.y), y2: sy(D.means.y), x1: sx(lo), x2: sx(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
+  el("line", { x1: sx(C.mx), x2: sx(C.mx), y1: sy(lo), y2: sy(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
+  el("line", { y1: sy(C.my), y2: sy(C.my), x1: sx(lo), x2: sx(hi), stroke: "#555", "stroke-dasharray": "4 3", "stroke-width": 0.8 }, svg);
 
   // points: missing first, so the coloured ones sit on top
   const order = idx.slice().sort((a, b) => (spec.value(a) == null) - (spec.value(b) == null)).reverse();
@@ -183,7 +218,7 @@ function panel(idx, title, spec, single) {
   const g = el("g", {}, svg);
   order.forEach(i => {
     const missing = spec.value(i) == null;
-    el("circle", { cx: sx(D.x[i] + D.jx[i]), cy: sy(D.y[i] + D.jy[i]), r, fill: spec.colour(i),
+    el("circle", { cx: sx(C.x[i] + C.jx * D.jx[i]), cy: sy(C.y[i] + C.jy * D.jy[i]), r, fill: spec.colour(i),
                    "fill-opacity": missing ? 0.45 : (spec.kind === "binary" && spec.value(i) === 0 ? 0.4 : 0.7), "data-i": i }, g);
   });
   g.addEventListener("mousemove", e => {
@@ -196,7 +231,7 @@ function panel(idx, title, spec, single) {
 
   // group mean
   let sw = 0, mx = 0, my = 0;
-  idx.forEach(i => { sw += D.w[i]; mx += D.w[i] * D.x[i]; my += D.w[i] * D.y[i]; });
+  idx.forEach(i => { sw += D.w[i]; mx += D.w[i] * C.x[i]; my += D.w[i] * C.y[i]; });
   if (sw) {
     const cx = sx(mx / sw), cy = sy(my / sw), s = single ? 7 : 5.5;
     el("path", { d: `M${cx - s},${cy}H${cx + s}M${cx},${cy - s}V${cy + s}`, stroke: "#fff", "stroke-width": 4.5 }, svg);
@@ -205,7 +240,7 @@ function panel(idx, title, spec, single) {
 
   // quadrant labels: weighted share and colour summary
   QUAD.forEach(q => {
-    const inq = idx.filter(i => (D.x[i] > D.means.x) === q.right && (D.y[i] > D.means.y) === q.top);
+    const inq = idx.filter(i => (C.x[i] > C.mx) === q.right && (C.y[i] > C.my) === q.top);
     const share = sw ? inq.reduce((a, i) => a + D.w[i], 0) / sw : 0;
     const x = q.right ? sx(hi) - 5 : sx(lo) + 5, y = q.top ? sy(hi) + (single ? 15 : 12) : sy(lo) - (single ? 20 : 16);
     const anchor = q.right ? "end" : "start", fs = single ? 12 : 10.5;
@@ -219,7 +254,7 @@ function panel(idx, title, spec, single) {
 }
 
 function tipText(i, spec) {
-  let s = `Illicit drugs: <b>${D.x[i].toFixed(2)}</b><br>Alcohol and tobacco: <b>${D.y[i].toFixed(2)}</b>`;
+  let s = `${cap(C.xlab)}: <b>${C.x[i].toFixed(2)}</b><br>${cap(C.ylab)}: <b>${C.y[i].toFixed(2)}</b>`;
   const sp = splitSel.value;
   if (sp !== "none") { const S = D.splits[sp]; s += `<br>${S.label}: ${S.assign[i] == null ? "missing" : S.groups[S.assign[i] - 1]}`; }
   if (spec.kind === "cat") s += `<br>${spec.value(i) == null ? "missing" : spec.groups[spec.value(i) - 1]}`;
@@ -239,11 +274,12 @@ function draw() {
   const spec = colourSpec();
   drawLegend(spec);
   const P = document.getElementById("panels"); P.innerHTML = "";
-  const all = [...Array(N).keys()];
+  axisScores();
+  const all = C.valid;
   const sp = splitSel.value;
   if (sp === "none") {
     P.style.gridTemplateColumns = "auto";
-    P.appendChild(panel(all, `All respondents <span>(n = ${N})</span>`, spec, true));
+    P.appendChild(panel(all, `All respondents <span>(n = ${all.length})</span>`, spec, true));
     return;
   }
   const S = D.splits[sp];

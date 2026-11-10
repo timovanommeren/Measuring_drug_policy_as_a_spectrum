@@ -10,19 +10,33 @@ source(here::here("analysis", "R", "utils", "report_helpers.R"))
 # there, per respondent over the drugs answered, as in utils/party_map_scores.R.
 # In the browser the map can be split into panels by the descriptive report's split variables (plus party),
 # and the points coloured by any attitude item: belief and behaviour items on a 1-7 gradient, emotion boxes
-# ticked or not, involvement on a 0-100 gradient, own use on 1-4.
+# ticked or not, involvement on a 0-100 gradient, own use on 1-4. Dragging a box over dots lists those
+# respondents in a table under the map (demographics, vote, own use, involvement, their nine policy answers),
+# with the group's weighted profile against everyone on the map.
 # The data are inlined into the HTML, so the output stays in analysis/output/ (not tracked) and must not be
 # shared or published. Output: analysis/output/respondent_quadrants_interactive.html
 
 d <- df
 excluded <- c("Niet-stemmers", "Blanco", "Mocht (nog) niet stemmen", "DENK", "Anders")  # as in the party map
-drugs <- c("alcohol", "tabak_en_vapes", "cannabis", "psychedelica", "mdma", "cocaine", "speed", "heroine")
+drugs <- c("alcohol", "tabak_en_vapes", "cannabis", "psychedelica", "mdma", "speed", "cocaine", "heroine", "pijnstillers")
 
 # the report's split buttons, plus party (every party on the party map; DENK, Anders, blank, non-voters NA)
 splits <- build_splits(d)
 party <- factor(replace(as.character(d$vote_recall_rec), as.character(d$vote_recall_rec) %in% excluded, NA))
 splits$party <- list(label = "Partij (stemherinnering)", groups = levels(party), assign = as.integer(party))
 splits <- map(splits, \(s) s[c("label", "groups", "assign")])
+
+# the respondent table under the map (rows for the dots selected with a box, and their profile against the sample)
+as_group <- \(label, column) { column <- droplevels(as.factor(column)); list(label = label, groups = levels(column), assign = as.integer(column)) }
+info <- list(
+  sex  = as_group("Sex", d$sex_rec),
+  age  = as_group("Age", d$age_group),
+  edu  = as_group("Education", fct_rev(d$edu_group)),
+  urb  = as_group("Urbanisation", d$urb_group),
+  prov = as_group("Province", d$geo_prov_rec),
+  vote = as_group("Vote (TK 2025)", d$vote_recall_rec),
+  use  = as_group("Own use (heaviest ever)", d$substance_ladder)
+)
 
 # the variables to colour by
 item <- function(col, block, type, label = var_label(col, d)) {
@@ -53,6 +67,8 @@ data <- list(
   w = as.numeric(d$w),
   jx = runif(nrow(d), -1, 1), jy = runif(nrow(d), -1, 1),  # jitter, scaled in the browser to the axis's step
   splits = splits,
+  info = info,
+  involvement = as.numeric(d$betrokkenheid_mean),
   vars = colour_vars,
   use_labels = names(attr(d$gebruik_1, "labels"))[1:4]
 )

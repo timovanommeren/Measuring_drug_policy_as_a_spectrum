@@ -30,6 +30,21 @@
          border-radius: 4px; padding: 6px 8px; font-size: 11.5px; line-height: 1.4; display: none;
          box-shadow: 0 2px 6px rgba(0,0,0,0.12); max-width: 300px; }
   .key { font-size: 11px; color: #777; margin-top: 8px; }
+  svg.brushable { cursor: crosshair; user-select: none; }
+  #selection { margin-top: 18px; font-size: 12px; max-width: 1250px; }
+  #selection h2 { font-size: 15px; margin: 0 0 6px; }
+  #selection .hint { color: #777; }
+  #selection button { font-size: 12px; margin-left: 10px; padding: 2px 8px; }
+  table.profile { border-collapse: collapse; margin: 6px 0 14px; }
+  table.profile td { padding: 2px 10px 2px 0; vertical-align: top; }
+  table.profile td:first-child { color: #555; white-space: nowrap; }
+  table.profile .up { color: #00664a; font-weight: 600; } table.profile .down { color: #9b2c2c; }
+  table.rows { border-collapse: collapse; }
+  table.rows th { text-align: left; font-weight: 600; color: #444; border-bottom: 1px solid #ccc; padding: 3px 8px 3px 0; white-space: nowrap; }
+  table.rows td { padding: 2px 8px 2px 0; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+  .strip { display: inline-flex; gap: 1px; }
+  .strip b { width: 23px; text-align: center; font-weight: 600; font-size: 11px; border-radius: 2px; }
+  .privacy { color: #9b2c2c; font-size: 11px; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -38,7 +53,8 @@
 from ban (1) to free sale (9). Respondents with no answer for either axis are left out. Dashed lines
 are the weighted means of all respondents on the map, in every panel; the black cross is the panel's own weighted mean.
 Quadrant shares and the colour summaries are weighted. Dots are jittered slightly, since a mean over six or two answers
-takes few values; the jitter shrinks as the axis averages over more drugs. Hollow grey rings: "geen mening" on the colour item.</div>
+takes few values; the jitter shrinks as the axis averages over more drugs. <b>Drag a box over dots</b> to list
+those respondents below the map; click without dragging to clear. Hollow grey rings: "geen mening" on the colour item.</div>
 
 <div class="controls">
   <label>Horizontal axis<select id="xaxis"></select></label>
@@ -50,6 +66,7 @@ takes few values; the jitter shrinks as the axis averages over more drugs. Hollo
 <div id="wording"></div>
 <div id="legend"></div>
 <div id="panels"></div>
+<div id="selection"></div>
 <div class="key">Policy options: 1 Ban · 2 Research only · 3 Treatment only · 4 Prescription only · 5 Specialist shop, non-profit ·
 6 Specialist shop, for-profit · 7 Sold everywhere, no advertising · 8 Sold everywhere, with advertising · 9 Free sale</div>
 <div id="tip"></div>
@@ -199,7 +216,7 @@ function panel(idx, title, spec, single) {
   const sy = v => H - m.b - (v - lo) / (hi - lo) * (H - m.t - m.b);
   const box = document.createElement("div");
   if (title) { const t = document.createElement("div"); t.className = "panel-title"; t.innerHTML = title; box.appendChild(t); }
-  const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, box);
+  const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: "brushable" }, box);
 
   // grid and ticks
   for (let k = 1; k <= 9; k++) {
@@ -227,13 +244,19 @@ function panel(idx, title, spec, single) {
   const order = idx.slice().sort((a, b) => rank(a) - rank(b));
   const r = single ? 2.8 : 2.1;
   const g = el("g", {}, svg);
+  const dim = SELECTED.size > 0;
   order.forEach(i => {
-    const missing = spec.value(i) == null;
+    const missing = spec.value(i) == null, picked = SELECTED.has(i);
     // "geen mening" / missing: a hollow grey ring, so it cannot be read as a pale colour
     el("circle", Object.assign({ cx: sx(C.x[i] + C.jx * D.jx[i]), cy: sy(C.y[i] + C.jy * D.jy[i]), r, "data-i": i },
        missing ? { fill: "#fff", "fill-opacity": 0, stroke: "#9a9a9a", "stroke-width": 0.8, "stroke-opacity": 0.8 }
-               : { fill: spec.colour(i), "fill-opacity": spec.kind === "likert" ? 0.9 : (spec.kind === "binary" && spec.value(i) === 0 ? 0.4 : 0.7) }), g);
+               : { fill: spec.colour(i), "fill-opacity": spec.kind === "likert" ? 0.9 : (spec.kind === "binary" && spec.value(i) === 0 ? 0.4 : 0.7) },
+       // a selection fades the other dots and outlines the selected ones
+       dim ? (picked ? { stroke: "#000", "stroke-width": 0.9, "stroke-opacity": 1 } : { opacity: 0.18 }) : {}), g);
   });
+  // selected dots on top
+  if (dim) [...g.querySelectorAll("circle")].filter(c => SELECTED.has(+c.getAttribute("data-i"))).forEach(c => g.appendChild(c));
+  brush(svg, g);
   g.addEventListener("mousemove", e => {
     const i = e.target.getAttribute && e.target.getAttribute("data-i");
     if (i == null) { tip.style.display = "none"; return; }
@@ -286,6 +309,95 @@ function tipText(i, spec) {
   return s;
 }
 
+// ---- box selection ----
+let SELECTED = new Set();
+function brush(svg, g) {
+  let start = null, rect = null;
+  const pt = e => { const b = svg.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+  svg.addEventListener("mousedown", e => {
+    e.preventDefault(); start = pt(e);
+    rect = el("rect", { x: start[0], y: start[1], width: 0, height: 0, fill: "rgba(0,0,0,0.06)", stroke: "#333",
+                        "stroke-dasharray": "3 2", "stroke-width": 0.8 }, svg);
+    const move = ev => {
+      const [x, y] = pt(ev);
+      rect.setAttribute("x", Math.min(x, start[0])); rect.setAttribute("y", Math.min(y, start[1]));
+      rect.setAttribute("width", Math.abs(x - start[0])); rect.setAttribute("height", Math.abs(y - start[1]));
+    };
+    const up = ev => {
+      window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
+      const [x, y] = pt(ev), x0 = Math.min(x, start[0]), x1 = Math.max(x, start[0]),
+            y0 = Math.min(y, start[1]), y1 = Math.max(y, start[1]);
+      SELECTED = new Set();
+      if (x1 - x0 > 3 || y1 - y0 > 3)   // a click without dragging clears the selection
+        g.querySelectorAll("circle").forEach(c => {
+          const cx = +c.getAttribute("cx"), cy = +c.getAttribute("cy");
+          if (cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1) SELECTED.add(+c.getAttribute("data-i"));
+        });
+      draw();
+    };
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+  });
+}
+
+const POLICY_DRUGS = [["alcohol", "Alc"], ["tabak_en_vapes", "Tob"], ["cannabis", "Can"], ["psychedelica", "Psy"],
+                      ["mdma", "MD"], ["speed", "Spd"], ["cocaine", "Coc"], ["heroine", "Her"], ["pijnstillers", "Pain"]];
+// 1 = ban (dark red) ... 5 (grey) ... 9 = free sale (dark blue)
+const POLICY_COL = ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#e0e0e0", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac"];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function renderSelection(spec) {
+  const box = document.getElementById("selection");
+  const sel = C.valid.filter(i => SELECTED.has(i));
+  if (!sel.length) {
+    box.innerHTML = `<h2>Selected respondents</h2><div class="hint">Drag a box over dots in any panel to list those respondents here.</div>`;
+    return;
+  }
+  const wsum = idx => idx.reduce((a, i) => a + D.w[i], 0);
+  // profile: per variable, every category's weighted share in the selection against everyone on the map
+  // (among those with an answer); categories that are 10+ points over- or under-represented are marked
+  const share = (idx, v, k) => { const has = idx.filter(i => v.assign[i] != null), t = wsum(has);
+                                 return t ? wsum(has.filter(i => v.assign[i] === k)) / t : 0; };
+  const prof = Object.values(D.info).map(v => {
+    const cats = v.groups.map((gname, j) => ({ gname, s: share(sel, v, j + 1), b: share(C.valid, v, j + 1) }))
+                        .filter(c => c.s > 0 || v.groups.length <= 4)
+                        .sort((a, b) => v.groups.length > 4 ? b.s - a.s : 0);
+    const shown = cats.slice(0, 6).map(c => {
+      const cls = c.s - c.b >= 0.10 ? "up" : (c.b - c.s >= 0.10 ? "down" : "");
+      return `<span class="${cls}">${esc(c.gname)} ${Math.round(100 * c.s)}%</span> <span style="color:#999">(${Math.round(100 * c.b)}%)</span>`;
+    }).join(" · ");
+    return `<tr><td>${v.label}</td><td>${shown}${cats.length > 6 ? " · …" : ""}</td></tr>`;
+  });
+  const wmean = (idx, a) => { const h = idx.filter(i => a[i] != null), t = wsum(h); return t ? h.reduce((s, i) => s + D.w[i] * a[i], 0) / t : NaN; };
+  prof.push(`<tr><td>Involvement (mean)</td><td>${Math.round(wmean(sel, D.involvement))} <span style="color:#999">(${Math.round(wmean(C.valid, D.involvement))})</span></td></tr>`);
+  prof.push(`<tr><td>Policy (mean)</td><td>${POLICY_DRUGS.map(([d, l]) =>
+    `${l} ${wmean(sel, D.answers[d]).toFixed(1)} <span style="color:#999">(${wmean(C.valid, D.answers[d]).toFixed(1)})</span>`).join(" · ")}</td></tr>`);
+
+  // rows, at most 300
+  const lab = (v, i) => v.assign[i] == null ? "–" : esc(v.groups[v.assign[i] - 1]);
+  const I = D.info, colourCol = !["none", "cat"].includes(spec.kind);
+  const val = i => { const x = spec.value(i); if (x == null) return "–";
+    if (spec.kind === "binary") return x === 1 ? "ticked" : "–"; if (spec.kind === "slider") return Math.round(x); return x; };
+  const strip = i => `<span class="strip">${POLICY_DRUGS.map(([d]) => { const x = D.answers[d][i];
+    return x == null ? `<b style="color:#aaa">–</b>` : `<b style="background:${POLICY_COL[x - 1]};color:${x <= 2 || x >= 8 ? "#fff" : "#222"}">${x}</b>`; }).join("")}</span>`;
+  const rows = sel.slice(0, 300).map(i => `<tr><td>${lab(I.sex, i)}</td><td>${lab(I.age, i)}</td><td>${lab(I.edu, i)}</td>
+    <td>${lab(I.urb, i)}</td><td>${lab(I.prov, i)}</td><td>${lab(I.vote, i)}</td><td>${lab(I.use, i)}</td>
+    <td style="text-align:right">${D.involvement[i] == null ? "–" : Math.round(D.involvement[i])}</td><td>${strip(i)}</td>
+    ${colourCol ? `<td style="text-align:center">${val(i)}</td>` : ""}</tr>`).join("");
+  const head = `<tr><th>Sex</th><th>Age</th><th>Education</th><th>Urbanisation</th><th>Province</th><th>Vote</th><th>Own use</th>
+    <th>Involv.</th><th><span class="strip">${POLICY_DRUGS.map(([, l]) => `<b style="font-weight:600;font-size:9.5px">${l}</b>`).join("")}</span></th>
+    ${colourCol ? `<th title="${esc(spec.v.label)}">Colour item</th>` : ""}</tr>`;
+
+  box.innerHTML = `<h2>Selected respondents: ${sel.length} <span style="font-weight:400;color:#777;font-size:12px">
+    (${Math.round(100 * wsum(sel) / wsum(C.valid))}% of the map, weighted)</span><button id="clear">Clear selection</button></h2>
+    <div class="hint">Profile: weighted share of the selection in each category, in brackets everyone on the map; green = 10+ points
+    over-represented, red = 10+ under. ${sel.length < 30 ? "<b>Fewer than 30 respondents: read the shares as counts, not as estimates.</b>" : ""}</div>
+    <table class="profile">${prof.join("")}</table>
+    <table class="rows">${head}${rows}</table>
+    ${sel.length > 300 ? `<div class="hint">Showing the first 300 of ${sel.length}.</div>` : ""}
+    <div class="privacy">Individual rows are for exploring only: do not copy them into slides, the paper or anything shared outside the team. The profile is the shareable part.</div>`;
+  document.getElementById("clear").onclick = () => { SELECTED = new Set(); draw(); };
+}
+
 function draw() {
   const spec = colourSpec();
   drawLegend(spec);
@@ -296,6 +408,7 @@ function draw() {
   if (sp === "none") {
     P.style.gridTemplateColumns = "auto";
     P.appendChild(panel(all, `All respondents <span>(n = ${all.length})</span>`, spec, true));
+    renderSelection(spec);
     return;
   }
   const S = D.splits[sp];
@@ -307,6 +420,7 @@ function draw() {
   });
   const miss = all.filter(i => S.assign[i] == null);
   if (miss.length) P.appendChild(panel(miss, `Missing <span>(n = ${miss.length})</span>`, spec, false));
+  renderSelection(spec);
 }
 draw();
 </script>

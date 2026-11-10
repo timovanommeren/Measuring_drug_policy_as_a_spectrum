@@ -42,6 +42,9 @@
   table.profile .up { color: #00664a; font-weight: 600; } table.profile .down { color: #9b2c2c; }
   table.rows { border-collapse: collapse; }
   table.rows th { text-align: left; font-weight: 600; color: #444; border-bottom: 1px solid #ccc; padding: 3px 8px 3px 0; white-space: nowrap; }
+  table.rows [data-sort] { cursor: pointer; user-select: none; }
+  table.rows [data-sort]:hover { color: #000; text-decoration: underline; }
+  table.rows .sorted { color: #000; }
   table.rows td { padding: 2px 8px 2px 0; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
   .strip { display: inline-flex; gap: 1px; }
   .strip b { width: 23px; text-align: center; font-weight: 600; font-size: 11px; border-radius: 2px; }
@@ -346,7 +349,10 @@ const POLICY_DRUGS = [["alcohol", "Alc"], ["tabak_en_vapes", "Tob"], ["cannabis"
 const POLICY_COL = ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#e0e0e0", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac"];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
+// the table's sort: a column key and a direction; null = the order of the data file
+let SORT = null, LAST_SPEC = null;
 function renderSelection(spec) {
+  LAST_SPEC = spec;
   const box = document.getElementById("selection");
   const sel = C.valid.filter(i => SELECTED.has(i));
   if (!sel.length) {
@@ -374,9 +380,28 @@ function renderSelection(spec) {
   prof.push(`<tr><td>Policy (mean)</td><td>${POLICY_DRUGS.map(([d, l]) =>
     `${l} ${wmean(sel, D.answers[d]).toFixed(1)}`).join(" · ")}</td></tr>`);
 
-  // rows, at most 300
+  // rows, sorted by the clicked column (missing always last), at most 300
   const lab = (v, i) => v.assign[i] == null ? "–" : esc(v.groups[v.assign[i] - 1]);
   const I = D.info, colourCol = !["none", "cat"].includes(spec.kind);
+  // sort keys: categories in their own order (low to high for age, education, urbanisation, own use),
+  // province and vote alphabetically, numbers numerically
+  const byLabel = v => i => v.assign[i] == null ? null : v.groups[v.assign[i] - 1];
+  const byLevel = v => i => v.assign[i];
+  const KEYS = { sex: byLabel(I.sex), age: byLevel(I.age), edu: byLevel(I.edu), urb: byLevel(I.urb),
+                 prov: byLabel(I.prov), vote: byLabel(I.vote), use: byLevel(I.use), inv: i => D.involvement[i],
+                 colour: i => spec.value(i) };
+  POLICY_DRUGS.forEach(([d]) => KEYS["p_" + d] = i => D.answers[d][i]);
+  if (SORT && !KEYS[SORT.key]) SORT = null;   // e.g. the colour column after switching the colour off
+  if (SORT) {
+    const k = KEYS[SORT.key];
+    sel.sort((a, b) => {
+      const x = k(a), y = k(b);
+      if (x == null || y == null) return (x == null) - (y == null);
+      return SORT.dir * (typeof x === "string" ? x.localeCompare(y, "nl") : x - y);
+    });
+  }
+  const arrow = key => SORT && SORT.key === key ? (SORT.dir > 0 ? " ▲" : " ▼") : "";
+  const th = (key, text, extra = "") => `<th data-sort="${key}" class="${SORT && SORT.key === key ? "sorted" : ""}" ${extra}>${text}${arrow(key)}</th>`;
   const val = i => { const x = spec.value(i); if (x == null) return "–";
     if (spec.kind === "binary") return x === 1 ? "ticked" : "–"; if (spec.kind === "slider") return Math.round(x); return x; };
   const strip = i => `<span class="strip">${POLICY_DRUGS.map(([d]) => { const x = D.answers[d][i];
@@ -385,19 +410,27 @@ function renderSelection(spec) {
     <td>${lab(I.urb, i)}</td><td>${lab(I.prov, i)}</td><td>${lab(I.vote, i)}</td><td>${lab(I.use, i)}</td>
     <td style="text-align:right">${D.involvement[i] == null ? "–" : Math.round(D.involvement[i])}</td><td>${strip(i)}</td>
     ${colourCol ? `<td style="text-align:center">${val(i)}</td>` : ""}</tr>`).join("");
-  const head = `<tr><th>Sex</th><th>Age</th><th>Education</th><th title="Address density, addresses per km2">Urbanisation</th><th>Province</th><th>Vote</th><th>Own use</th>
-    <th>Involv.</th><th><span class="strip">${POLICY_DRUGS.map(([, l]) => `<b style="font-weight:600;font-size:9.5px">${l}</b>`).join("")}</span></th>
-    ${colourCol ? `<th title="${esc(spec.v.label)}">Colour item</th>` : ""}</tr>`;
+  const head = `<tr>${th("sex", "Sex")}${th("age", "Age")}${th("edu", "Education")}${th("urb", "Urbanisation", 'title="Address density, addresses per km2"')}
+    ${th("prov", "Province")}${th("vote", "Vote")}${th("use", "Own use")}${th("inv", "Involv.")}
+    <th><span class="strip">${POLICY_DRUGS.map(([d, l]) => `<b data-sort="p_${d}" class="${SORT && SORT.key === "p_" + d ? "sorted" : ""}"
+      style="font-weight:600;font-size:9.5px" title="Sort by ${l}">${l}${SORT && SORT.key === "p_" + d ? (SORT.dir > 0 ? "▲" : "▼") : ""}</b>`).join("")}</span></th>
+    ${colourCol ? th("colour", "Colour item", `title="${esc(spec.v.label)}"`) : ""}</tr>`;
 
   box.innerHTML = `<h2>Selected respondents: ${sel.length} <span style="font-weight:400;color:#777;font-size:12px">
     (${Math.round(100 * wsum(sel) / wsum(C.valid))}% of the map, weighted)</span><button id="clear">Clear selection</button></h2>
-    <div class="hint">Profile: weighted share of the selection in each category; green = 10+ points more than on the whole map,
+    <div class="hint">Click a column header to sort the rows, again to reverse. Profile: weighted share of the selection in each category; green = 10+ points more than on the whole map,
     red = 10+ points less. ${sel.length < 30 ? "<b>Fewer than 30 respondents: read the shares as counts, not as estimates.</b>" : ""}</div>
     <table class="profile">${prof.join("")}</table>
     <table class="rows">${head}${rows}</table>
     ${sel.length > 300 ? `<div class="hint">Showing the first 300 of ${sel.length}.</div>` : ""}
     <div class="privacy">Individual rows are for exploring only: do not copy them into slides, the paper or anything shared outside the team. The profile is the shareable part.</div>`;
   document.getElementById("clear").onclick = () => { SELECTED = new Set(); draw(); };
+  // click a header to sort by it, again to reverse; numbers start high, text and categories start low
+  box.querySelectorAll("[data-sort]").forEach(h => h.onclick = () => {
+    const key = h.getAttribute("data-sort"), numeric = key === "inv" || key === "colour" || key.startsWith("p_");
+    SORT = SORT && SORT.key === key ? { key, dir: -SORT.dir } : { key, dir: numeric ? -1 : 1 };
+    renderSelection(LAST_SPEC);
+  });
 }
 
 function draw() {

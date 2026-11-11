@@ -48,6 +48,24 @@ latent_entry <- function(cls, prob, label, block, noun = "Class") {
        prob = round(prob, 3))
 }
 
+# manual groups: two yes/no rules on the policy answers (1 = ban ... 9 = free sale), so the four groups are exclusive
+# and cover everyone who answered. A rule passes when every drug in it the respondent answered is at or above its
+# threshold; NA ("unclassified") when they answered none of its drugs. Change the thresholds here to try other cuts
+legal_rule   <- c(alcohol = 7, tabak_en_vapes = 5)             # liberal on the legal drugs
+illicit_rule <- c(cannabis = 5, psychedelica = 5, mdma = 5)    # liberal on the soft illicit drugs; hard drugs free
+passes <- \(rule) {
+  m <- mapply(\(v, k) policy(v) >= k, names(rule), rule)
+  if_else(rowSums(!is.na(m)) == 0, NA, rowSums(!m, na.rm = TRUE) == 0)
+}
+legal <- passes(legal_rule)
+illicit <- passes(illicit_rule)
+splits$manual <- list(
+  label = "Manual groups (legal and soft-drug rules)", block = "Manual groups",
+  groups = c("Abstainers: restrictive on both", "Double standards: liberal on legal only",
+             "Liberals: liberal on both", "Reformers: liberal on illicit only"),
+  assign = case_when(!legal & !illicit ~ 1L, legal & !illicit ~ 2L, legal & illicit ~ 3L, !legal & illicit ~ 4L),
+  colours = c("#2b7aa8", "#9c6b00", "#00664a", "#8f4a76"))   # the colours of the matching quadrant labels
+
 latent <- list()
 lca_file <- here::here("analysis", "output", "latent_models", "lca", "lca_fits.rds")
 if (file.exists(lca_file)) {

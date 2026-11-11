@@ -177,8 +177,10 @@ function colourSpec() {
   if (c === "none") return { colour: () => "#3b528b", value: () => 1, kind: "none" };
   if (c.startsWith("split:")) {
     const s = D.splits[c.slice(6)];
-    return { kind: "cat", groups: s.groups, prob: s.prob, value: i => s.assign[i],
-             colour: i => s.assign[i] == null ? NA_COL : CAT_COL[(s.assign[i] - 1) % CAT_COL.length] };
+    // a split can bring its own colours (the manual groups use the quadrant colours)
+    const pal = s.colours || CAT_COL;
+    return { kind: "cat", groups: s.groups, pal, prob: s.prob, value: i => s.assign[i],
+             colour: i => s.assign[i] == null ? NA_COL : pal[(s.assign[i] - 1) % pal.length] };
   }
   const v = D.vars[+c.slice(4)];
   const flip = scoredBox.checked && v.anti;
@@ -204,7 +206,7 @@ function drawLegend(spec) {
   L.innerHTML = ""; W.textContent = "";
   const sw = (col, txt) => { const s = document.createElement("span"); s.className = "sw"; s.innerHTML = `<i${col === NA_COL ? ' class="ring"' : ""} style="background:${col}"></i>${txt}`; L.appendChild(s); };
   if (spec.kind === "none") return;
-  if (spec.kind === "cat") { spec.groups.forEach((g, k) => sw(CAT_COL[k % CAT_COL.length], g)); sw(NA_COL, "missing"); return; }
+  if (spec.kind === "cat") { spec.groups.forEach((g, k) => sw(spec.pal[k % spec.pal.length], g)); sw(NA_COL, "missing / unclassified"); return; }
   W.innerHTML = "<b>" + spec.v.label + "</b>" + (spec.v.anti ? (spec.flip ? " <span style='color:#888'>(reversed: 7 = strongly disagree)</span>" : " <span style='color:#888'>(agreeing favours prohibition)</span>") : "");
   if (spec.kind === "likert") {
     const labs = spec.flip ? LIKERT.slice().reverse() : LIKERT;

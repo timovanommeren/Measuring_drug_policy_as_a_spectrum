@@ -18,8 +18,8 @@ analysis/
     00_load_and_clean.R        reads the data, recodes, sets the weights and the survey design
     01_fig_policy_preferences.R  Figure 1 (answer scale) and Figure 2 (preferences per substance)
     02_fig_gradient_grid.R     Figure 3 (preferences by demographic) + its detailed appendix version
-    03_fig_party_map.R         Figure 4 (a: party map with standard-deviation ellipses; b: the six largest
-                               parties on the stylised U-curve of harms)
+    03_fig_party_map.R         Figure 4 (a: party map with standard-deviation ellipses; b: every party's distance
+                               from the sample mean on the stylised U-curve of harms)
     07_party_within_between.R  Results: within- and between-party model of the party-map scores (Table 3)
     A1_weights.R               Appendix: weighting diagnostics
     A2_attitudes.R             Appendix: correlations between policy and the attitude items
@@ -46,7 +46,7 @@ Every script sources `00_load_and_clean.R` itself, so each can be run on its own
 | Figure 1: answer scale | `out/fig_policy_scale.pdf` | `01_fig_policy_preferences.R` |
 | Figure 2: preferred policy per substance | `out/fig_policy_preferences.tex`, `out/policy_preferences_all_drugs.pdf` | `01_fig_policy_preferences.R` |
 | Figure 3: preferences by demographic | `out/fig_gradient_grid.tex/.pdf` | `02_fig_gradient_grid.R` |
-| Figure 4: (a) party map with standard-deviation ellipses, (b) the six largest parties on the U-curve | `out/fig_party_map.tex/.pdf`, `out/fig_party_map_b.pdf` | `03_fig_party_map.R` |
+| Figure 4: (a) party map with standard-deviation ellipses, (b) every party's distance from the sample mean on the U-curve | `out/fig_party_map.tex/.pdf`, `out/fig_party_map_b.pdf` | `03_fig_party_map.R` |
 | Results: within- and between-party model (table and numbers in the text) | `out/tab_party_within_between.tex`, `out/party_within_between_numbers.tex` | `07_party_within_between.R` |
 | Methods: numbers in the text (macros) | `out/methods_numbers.tex` | `04_methods_numbers.R` |
 | Methods: sample composition table | `out/tab_sample_composition.tex` | `05_tab_sample_composition.R` |

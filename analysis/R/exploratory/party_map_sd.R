@@ -12,7 +12,7 @@ source(here::here("analysis", "R", "utils", "party_map_scores.R"))
 # utils/party_map_scores.R.
 # Output: analysis/output/party_map_sd.pdf
 
-sd_mult <- 1   # ellipse size in standard deviations; the caption follows
+sd_mult <- 0.1   # ellipse size in standard deviations; the caption and the zoom follow
 
 bloc <- df |> distinct(party = as.character(vote_recall_rec), bloc = vote_3) |> drop_na()
 party_sd <- resp |>
@@ -34,7 +34,7 @@ ellipses <- party_sd |>
 p <- ggplot(party_sd, aes(mx, my, colour = bloc)) +
   geom_hline(yintercept = ref[["y"]], linetype = "dashed", linewidth = 0.3, colour = "grey50") +
   geom_vline(xintercept = ref[["x"]], linetype = "dashed", linewidth = 0.3, colour = "grey50") +
-  geom_polygon(data = ellipses, aes(ex, ey, group = party, fill = bloc), alpha = 0.04, linewidth = 0.45,
+  geom_polygon(data = ellipses, aes(ex, ey, group = party, fill = bloc), alpha = 0.15, linewidth = 0.45,
                show.legend = FALSE) +
   geom_point(aes(size = n)) +
   geom_label_repel(aes(label = party), size = 2.6, fontface = "bold", fill = alpha("white", 0.85), label.size = NA,
@@ -45,7 +45,7 @@ p <- ggplot(party_sd, aes(mx, my, colour = bloc)) +
   scale_size_area(max_size = 4, breaks = c(25, 100, 200), name = "Voters (n)") +
   scale_x_continuous(breaks = 1:9) +
   scale_y_continuous(breaks = 1:9) +
-  coord_fixed(xlim = c(0.6, 5.6), ylim = c(1.8, 8.4)) +   # zoomed to the ellipses; widen if sd_mult goes up
+  coord_fixed(xlim = range(ellipses$ex) + c(-0.3, 0.3), ylim = range(ellipses$ey) + c(-0.3, 0.3)) +  # zoomed to the ellipses
   labs(x = "Mean preferred policy: illicit drugs (1 = ban ... 9 = free sale)",
        y = "Mean preferred policy: alcohol and tobacco",
        caption = str_wrap(sprintf(paste(

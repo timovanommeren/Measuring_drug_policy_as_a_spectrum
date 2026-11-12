@@ -106,24 +106,27 @@ df <- df |>
 # (2.50) and PvdA (3.00); 50PLUS is not in the 2024 wave, so its 2019 score (trend file); JA21 has
 # never been rated and is placed between VVD and PVV, as its founders positioned it. Volt (4.55)
 # falls in the middle third but is set to left by hand.
+# galtan: the cultural position (0 = green/alternative/libertarian ... 10 = traditional/authoritarian/
+# nationalist), same wave and rules (GroenLinks-PvdA = mean of GL 0.92 and PvdA 2.58; 50PLUS 2019; JA21
+# between VVD and PVV); orders the parties in figure 4b
 # Anders, Blanco and Niet-stemmers are NA
 party_ches <- tribble(
-  ~party,             ~lrgen,
-  "SP",               1.17,
-  "PvdD",             1.50,
-  "GroenLinks-PvdA",  2.75,
-  "DENK",             3.89,
-  "Volt",             4.55,
-  "CU",               4.58,
-  "D66",              4.67,
-  "50PLUS",           5.08,
-  "CDA",              5.75,
-  "VVD",              7.67,
-  "BBB",              7.75,
-  "SGP",              8.00,
-  "JA21",             8.50,
-  "PVV",              9.08,
-  "FvD",              9.83
+  ~party,             ~lrgen, ~galtan,
+  "SP",               1.17,  4.67,
+  "PvdD",             1.50,  2.25,
+  "GroenLinks-PvdA",  2.75,  1.75,
+  "DENK",             3.89,  6.29,
+  "Volt",             4.55,  1.09,
+  "CU",               4.58,  6.92,
+  "D66",              4.67,  1.33,
+  "50PLUS",           5.08,  5.60,
+  "CDA",              5.75,  6.50,
+  "VVD",              7.67,  5.92,
+  "BBB",              7.75,  7.67,
+  "SGP",              8.00,  9.42,
+  "JA21",             8.50,  7.00,
+  "PVV",              9.08,  8.09,
+  "FvD",              9.83,  9.83
 )
 
 df <- df |>

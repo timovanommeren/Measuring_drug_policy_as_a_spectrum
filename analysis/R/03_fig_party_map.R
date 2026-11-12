@@ -98,13 +98,23 @@ ggsave(here::here("out", "fig_party_map.pdf"), p_map, width = 6.5, height = 4.8,
 harm <- \(x) sqrt(((x - 5) / 4)^2 + 0.01)
 on_arm <- \(h, side) 5 + side * 4 * sqrt(pmax(h^2 - 0.01, 0))
 
-# every party gets a row, at the same height on both arms, ordered by its general left-right position (Chapel Hill
-# lrgen, party_ches in 00_load_and_clean.R): right at the top. On each arm the arrow starts on the U and has the
-# length and direction of the party mean minus the sample mean, in scale points: illicit drugs on the left arm,
-# alcohol and tobacco on the right
+# every party gets a row, at the same height on both arms, ordered by row_order (top = highest):
+#   "lrgen"           general left-right position (Chapel Hill 2024, party_ches in 00_load_and_clean.R), right on top
+#   "galtan"          cultural position (same source), traditional/authoritarian on top
+#   "double_standard" the party's alcohol-and-tobacco deviation from the sample mean minus its illicit-drug
+#                     deviation: most liberal on legal and strictest on illicit drugs on top
+# On each arm the arrow starts on the U and has the length and direction of the party mean minus the sample mean, in
+# scale points: illicit drugs on the left arm, alcohol and tobacco on the right
+row_order <- "lrgen"   # the order in the paper; all three are also written to analysis/output/ for comparison
+order_labels <- c(lrgen = "general left-right (Chapel Hill Expert Survey 2024; right at the top)",
+                  galtan = "cultural position, GAL-TAN (Chapel Hill Expert Survey 2024; traditional at the top)",
+                  double_standard = "double standard: alcohol-and-tobacco minus illicit-drug distance from the sample mean (largest at the top)")
+
+panel_b <- function(order) {
 rows <- parties |>
   left_join(party_ches, by = "party") |>
-  mutate(h = scales::rescale(rank(lrgen, ties.method = "first"), to = c(0.3, 0.9)))
+  mutate(double_standard = (y - ref[["y"]]) - (x - ref[["x"]]),
+         h = scales::rescale(rank(.data[[order]], ties.method = "first"), to = c(0.38, 0.94)))
 arrows <- bind_rows(
   transmute(rows, party, bloc, n, h, drugs = "Illicit drugs", x0 = on_arm(h, -1), d = x - ref[["x"]]),
   transmute(rows, party, bloc, n, h, drugs = "Alcohol and tobacco", x0 = on_arm(h, 1), d = y - ref[["y"]])) |>
@@ -114,7 +124,7 @@ regimes <- tibble(x = c(1, 3, 5, 7, 9), hjust = 0.5,
                             "Lax regulation", "Unrestricted\naccess"))
 key <- tibble(x0 = 0.1, x1 = 1.1, h = 0.12)   # a reference arrow of one scale point
 
-p_curve <- ggplot() +
+ggplot() +
   geom_line(data = tibble(x = seq(1, 9, 0.01), y = harm(x)), aes(x, y), colour = "grey35", linewidth = 0.6) +
   geom_segment(data = arrows, aes(x = x0, xend = x1, y = h, yend = h, colour = bloc, linewidth = n),
                arrow = arrow(length = unit(1.4, "mm"), type = "closed")) +
@@ -137,8 +147,12 @@ p_curve <- ggplot() +
   theme_minimal(base_size = 10) +
   theme(panel.grid = element_blank(), text = element_text(size = 8), legend.position = "right",
         legend.key.size = unit(0.4, "cm"), plot.margin = margin(4, 8, 4, 4))
+}
 
-ggsave(here::here("out", "fig_party_map_b.pdf"), p_curve, width = 6.5, height = 4.4, device = cairo_pdf)
+ggsave(here::here("out", "fig_party_map_b.pdf"), panel_b(row_order), width = 6.5, height = 4.4, device = cairo_pdf)
+dir.create(here::here("analysis", "output"), showWarnings = FALSE)
+walk(names(order_labels), \(o) ggsave(here::here("analysis", "output", paste0("fig_party_map_b_", o, ".pdf")),
+                                       panel_b(o), width = 6.5, height = 4.4, device = cairo_pdf))
 
 caption <- paste0(
   r"((a) Parties by the mean preferred policy of their voters for the illicit drugs (horizontal) and for alcohol )",
@@ -154,8 +168,8 @@ caption <- paste0(
           sum(parties$n)),
   r"(non-voters are left out. Vote: TK 2025. )",
   r"((b) The same parties on a stylised U-curve of harms by regulatory regime, after the Transform Drug Policy )",
-  r"(Foundation. Each party has a row at the same height on both arms, ordered by general left-right position )",
-  r"((Chapel Hill Expert Survey 2024; right at the top). Each arrow starts on the curve and shows how far, and in )",
+  r"(Foundation. Each party has a row at the same height on both arms, ordered by )", order_labels[[row_order]],
+  r"(. Each arrow starts on the curve and shows how far, and in )",
   r"(which direction, the party's mean differs from the sample mean, in scale points: for the illicit drugs on the )",
   r"(left arm, for alcohol and tobacco on the right. Arrow width reflects the number of voters. The heights and )",
   r"(start points carry no data; the curve and the regime labels are illustrative.)"

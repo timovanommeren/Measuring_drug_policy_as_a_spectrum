@@ -1,63 +1,36 @@
 library(tidyverse)
-library(lmerTest)   # lme4 with p values for the fixed effects
-library(survey)
+library(lmerTest)   # lme4 with p values for the fixed effects (Satterthwaite)
 
 source(here::here("analysis", "R", "00_load_and_clean.R"))
 source(here::here("analysis", "R", "utils", "party_map_scores.R"))
 
 # Within- and between-party relation of the two party-map scores (figure 4a): legal-drug score (y: alcohol,
 # tobacco) on illicit-drug score (x), with x split into the party mean (between) and the voter's distance from it
-# (within), so the two slopes are estimated separately (Bell & Jones 2015, "within-between" model). Random
-# intercept and random within-slope per party. Party voters only, as on the map; 14 parties.
-# lme4 has no sampling weights: its weights are precision weights, here the survey weights scaled to mean 1, an
-# approximation; the unweighted fit and a design-based regression (svyglm, party as cluster) are the checks.
+# (within), so the two slopes are estimated separately (Bell & Jones 2015, "within-between" model). Random intercept
+# per party; a random within-slope adds nothing (its variance is ~0) and cannot be estimated with six parties.
+# Two models: all 14 parties on the map, and the six largest (GL-PvdA, D66, VVD, PVV, CDA, JA21).
+# Weights: the survey weights scaled to mean 1, as lme4's precision weights (an approximation; lme4 has no
+# sampling weights). The contextual model (x and the party mean together) tests between minus within.
 # Output: printed results and analysis/output/party_within_between.csv
+
+largest <- c("GroenLinks-PvdA", "D66", "VVD", "PVV", "CDA", "JA21")
 
 d <- resp |>
   mutate(x_between = weighted.mean(x, w), x_within = x - x_between, .by = party) |>
-  mutate(w1 = w / mean(w), n_party = n(), .by = NULL) |>
-  mutate(n_party = n(), .by = party)
+  mutate(w1 = w / mean(w))
 
-fit <- \(data, weights = data$w1, slope = TRUE) {
-  f <- if (slope) y ~ x_within + x_between + (1 + x_within | party) else y ~ x_within + x_between + (1 | party)
-  lmer(f, data = data, weights = weights, REML = FALSE)
-}
+samples <- list(`all 14 parties` = d, `6 largest parties` = filter(d, party %in% largest))
 
-m_int <- fit(d, slope = FALSE)
-m <- fit(d)
-print(summary(m))
-cat("\nrandom within-slope, likelihood ratio test:\n"); print(anova(m_int, m))
+results <- imap_dfr(samples, \(data, name) {
+  data <- mutate(data, w1 = w / mean(w))
+  m <- lmer(y ~ x_within + x_between + (1 | party), data = data, weights = w1, REML = FALSE)
+  ctx <- lmer(y ~ x + x_between + (1 | party), data = data, weights = w1, REML = FALSE)
+  cat("\n====", name, "====\n"); print(summary(m))
+  cf <- rbind(coef(summary(m))[c("x_within", "x_between"), ], coef(summary(ctx))["x_between", , drop = FALSE])
+  tibble(model = name, parties = n_distinct(data$party), n = nrow(data), term = c("within", "between", "between - within"),
+         estimate = cf[, "Estimate"], se = cf[, "Std. Error"], df = cf[, "df"], p = cf[, "Pr(>|t|)"])
+})
 
-# the contextual effect: with x itself and the party mean in the model, the party-mean coefficient is
-# between minus within, so its test asks whether the two slopes differ
-m_ctx <- lmer(y ~ x + x_between + (1 + x_within | party), data = d, weights = w1, REML = FALSE)
-cat("\ncontextual effect (between - within):\n"); print(coef(summary(m_ctx))["x_between", ])
-
-# sensitivity: unweighted; without the three small parties strict on both (SGP, CU, 50PLUS); parties with 40+ voters
-fits <- list(
-  weighted = m,
-  unweighted = fit(d, weights = NULL),
-  `without SGP, CU, 50PLUS` = fit(filter(d, !party %in% c("SGP", "CU", "50PLUS"))),
-  `parties with 40+ voters` = fit(filter(d, n_party >= 40))
-)
-design <- svydesign(ids = ~party, weights = ~w, data = d)
-svy <- svyglm(y ~ x_within + x_between, design = design)
-
-slopes <- imap_dfr(fits, \(m, name) {
-  cf <- coef(summary(m))
-  tibble(model = name, parties = n_distinct(model.frame(m)$party), n = nobs(m),
-         term = c("within", "between"), estimate = cf[c("x_within", "x_between"), "Estimate"],
-         se = cf[c("x_within", "x_between"), "Std. Error"], p = cf[c("x_within", "x_between"), "Pr(>|t|)"])
-}) |>
-  bind_rows(tibble(model = "design-based (svyglm, party clusters)", parties = 14, n = nrow(d), term = c("within", "between"),
-                   estimate = coef(svy)[c("x_within", "x_between")], se = SE(svy)[c("x_within", "x_between")],
-                   p = summary(svy)$coefficients[c("x_within", "x_between"), 4]))
 cat("\nslopes of the legal-drug score on the illicit-drug score (scale points per scale point):\n")
-print(mutate(slopes, across(c(estimate, se), \(v) round(v, 3)), p = signif(p, 2)), n = Inf, width = Inf)
-
-# each party's own within-slope (fixed + random part)
-cat("\nwithin-slope per party:\n")
-print(coef(m)$party |> rownames_to_column("party") |> select(party, within_slope = x_within) |>
-        left_join(count(d, party), by = "party") |> arrange(within_slope) |> mutate(within_slope = round(within_slope, 2)))
-
-write_csv(slopes, here::here("analysis", "output", "party_within_between.csv"))
+print(mutate(results, across(c(estimate, se, df), \(v) round(v, 3)), p = signif(p, 2)), n = Inf, width = Inf)
+write_csv(results, here::here("analysis", "output", "party_within_between.csv"))

@@ -13,9 +13,8 @@ source(here::here("analysis", "R", "utils", "party_map_scores.R"))
 # Figure 4b: the same party means on a stylised U-curve of harms by regulatory regime (after the Transform Drug
 # Policy Foundation), drawn over the same 1-9 scale: each party sits on the curve twice, at its mean for the
 # illicit drugs and for alcohol and tobacco, so its height is the harm the stylised curve implies for that regime.
-# Six largest parties. Each arrow starts on the U at the party mean and points horizontally away from the sample
-# mean; its length is the distance from the sample mean x the party's voters. The curve and the regime labels are
-# illustrative.
+# Six largest parties. Each arrow starts on the U at the status quo (current Dutch policy, coded below) and runs
+# horizontally to the party mean; width = number of voters. The curve and the regime labels are illustrative.
 # Output: out/fig_party_map.pdf (a), out/fig_party_map_b.pdf (b) and out/fig_party_map.tex (panel letters in LaTeX).
 # Variants of this map (logos, other drug pairs, medians, modes, middle options): exploratory/party_map_variants.R
 
@@ -99,41 +98,46 @@ ggsave(here::here("out", "fig_party_map.pdf"), p_map, width = 6.5, height = 4.8,
 harm <- \(x) sqrt(((x - 5) / 4)^2 + 0.01)
 on_arm <- \(h, side) 5 + side * 4 * sqrt(pmax(h^2 - 0.01, 0))
 largest <- c("GroenLinks-PvdA", "D66", "VVD", "PVV", "CDA", "JA21")
-max_len <- 1.6    # length of the longest arrow, in scale points
 min_gap <- 0.03   # smallest height difference between two arrows
 
-# per party and drug group: the arrow starts on the U at the party mean and points away from the sample mean, its
-# length the distance from the sample mean x voters, scaled so the longest is max_len. Parties closer than min_gap
-# in height are spread upward along the curve, so every arrow still starts on the U
-spread <- \(h) accumulate(h, \(prev, cur) max(cur, prev + min_gap))
+# current Dutch policy on the same 1-9 scale (authors' coding; check): cannabis 6 (coffeeshop), psychedelics 6
+# (truffles in smartshops), MDMA, speed and cocaine 1 (ban), heroin 3 (heroin-assisted treatment), alcohol 7
+# (sold everywhere, advertising restricted), tobacco 6 (no supermarket sales, no advertising). Averaged as the
+# party scores: illicit over the six illicit drugs, legal over alcohol and tobacco
+status_quo <- c(illicit = mean(c(cannabis = 6, psychedelica = 6, mdma = 1, speed = 1, cocaine = 1, heroine = 3)),
+                legal = mean(c(alcohol = 7, tabak_en_vapes = 6)))
+
+# per party and drug group: the arrow starts on the U at the status quo and runs horizontally to the party mean.
+# The start points are spread around the status quo, min_gap apart in height, along the curve, so every arrow
+# starts on the U; the party heading furthest along the arm starts highest, so arrows do not cross
 arrows <- bind_rows(
-  transmute(filter(parties, party %in% largest), party, bloc, n, drugs = "Illicit drugs", mean = ref[["x"]], x),
-  transmute(filter(parties, party %in% largest), party, bloc, n, drugs = "Alcohol and tobacco", mean = ref[["y"]],
-            x = y)) |>
-  mutate(side = sign(x - 5), pull = (x - mean) * n) |>
-  arrange(drugs, harm(x)) |>
-  mutate(h = spread(harm(x)), x0 = on_arm(h, side), .by = drugs) |>
-  mutate(x1 = x0 + max_len * pull / max(abs(pull)))
-means <- tibble(drugs = c("illicit drugs", "alcohol and tobacco"), x = c(ref[["x"]], ref[["y"]]), y = harm(x))
+  transmute(filter(parties, party %in% largest), party, bloc, n, drugs = "Illicit drugs", sq = status_quo[["illicit"]],
+            x),
+  transmute(filter(parties, party %in% largest), party, bloc, n, drugs = "Alcohol and tobacco",
+            sq = status_quo[["legal"]], x = y)) |>
+  mutate(side = sign(sq - 5), lane = rank(side * x, ties.method = "first"), .by = drugs) |>
+  mutate(h = harm(sq) + min_gap * (lane - (max(lane) + 1) / 2), x0 = on_arm(h, side), x1 = x, .by = drugs)
+sq_points <- tibble(drugs = c("illicit drugs", "alcohol and tobacco"), x = status_quo[c("illicit", "legal")], y = harm(x))
 regimes <- tibble(x = c(0.95, 3, 5, 7.5, 9.05), hjust = c(0, 0.5, 0.5, 0.5, 1),
                   label = c("Prohibition", "Medical access\n& harm reduction", "Responsible\nlegal regulation",
                             "Lax regulation", "Unrestricted\naccess"))
 
 p_curve <- ggplot() +
   geom_line(data = tibble(x = seq(1, 9, 0.01), y = harm(x)), aes(x, y), colour = "grey35", linewidth = 0.6) +
-  geom_segment(data = means, aes(x = x, xend = x, y = -0.06, yend = y), linetype = "dashed", colour = "grey55",
+  geom_segment(data = sq_points, aes(x = x, xend = x, y = -0.06, yend = y), linetype = "dashed", colour = "grey55",
                linewidth = 0.3) +
-  geom_text(data = means, aes(x, -0.09, label = paste("Mean,", drugs)), size = 2.3, colour = "grey30") +
-  geom_segment(data = arrows, aes(x = x0, xend = x1, y = h, yend = h, colour = bloc), linewidth = 0.9,
+  geom_text(data = sq_points, aes(x, -0.09, label = paste("Status quo,", drugs)), size = 2.3, colour = "grey30") +
+  geom_segment(data = arrows, aes(x = x0, xend = x1, y = h, yend = h, colour = bloc, linewidth = n),
                arrow = arrow(length = unit(1.6, "mm"), type = "closed")) +
-  geom_point(data = arrows, aes(x0, h, colour = bloc), size = 1.6) +
-  geom_text(data = arrows, aes(x1 + sign(pull) * 0.08, h, label = party, colour = bloc, hjust = if_else(pull > 0, 0, 1)),
-            size = 2.3, fontface = "bold", show.legend = FALSE) +
+  geom_point(data = arrows, aes(x0, h, colour = bloc), size = 1.2) +
+  geom_text(data = arrows, aes(x1 + sign(x1 - x0) * 0.08, h, label = party, colour = bloc,
+                               hjust = if_else(x1 > x0, 0, 1)), size = 2.3, fontface = "bold", show.legend = FALSE) +
   geom_text(data = regimes, aes(x, 1.05, label = label, hjust = hjust), size = 2.3, lineheight = 0.85,
             colour = "grey30") +
-  annotate("text", x = c(1.5, 6.6), y = c(0.9, 0.5), label = c("Illicit drugs", "Alcohol and tobacco"),
+  annotate("text", x = c(1.5, 6.9), y = c(0.9, 0.62), label = c("Illicit drugs", "Alcohol and tobacco"),
            fontface = "bold", size = 2.8, hjust = 0) +
   scale_colour_manual(values = bloc_colours, name = NULL) +
+  scale_linewidth_continuous(range = c(0.4, 1.5), limits = c(0, 250), breaks = c(100, 200), name = "Voters (n)") +
   scale_x_continuous(breaks = 1:9, labels = c("Ban (1)", "Research\nonly (2)", "Treatment\nonly (3)",
                                               "Prescription\nonly (4)", "Shop,\nnon-profit (5)", "Shop,\nfor-profit (6)",
                                               "Everywhere,\nno ads (7)", "Everywhere,\nads (8)", "Free sale (9)")) +
@@ -161,11 +165,11 @@ caption <- paste0(
           sum(parties$n)),
   r"(non-voters are left out. Vote: TK 2025. )",
   r"((b) The six largest parties on a stylised U-curve of harms by regulatory regime, after the Transform Drug )",
-  r"(Policy Foundation, drawn over the same scale as (a). Each arrow starts on the curve at the party's mean, for the )",
-  r"(illicit drugs and for alcohol and tobacco, so its height is the harm the stylised curve implies for that )",
-  r"(position, and points away from the sample mean (dashed); its length is the distance from the sample mean times )",
-  r"(the party's number of voters. Where two parties nearly coincide, one is moved a little along the curve. The )",
-  r"(curve and the placement of the regime labels on the scale are illustrative, not measured.)"
+  r"(Policy Foundation, drawn over the same scale as (a). Each arrow starts on the curve at the status quo (dashed: )",
+  r"(current Dutch policy coded on the same scale and averaged as the party scores; the starts are spread a little )",
+  r"(along the curve) and runs to the party's mean, for the illicit drugs and for alcohol and tobacco; arrow width )",
+  r"(reflects the number of voters. The curve and the placement of the regime labels on the scale are illustrative, )",
+  r"(not measured.)"
 )
 
 writeLines(c(

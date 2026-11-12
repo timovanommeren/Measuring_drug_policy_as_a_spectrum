@@ -1,14 +1,19 @@
 library(tidyverse)
+library(ggrepel)
 
 source(here::here("analysis", "R", "00_load_and_clean.R"))
-source(here::here("analysis", "R", "utils", "party_logos.R"))
 source(here::here("analysis", "R", "utils", "party_map_scores.R"))
 
-# Figure 4a: every party, with its logo, by mean preferred policy for the illicit drugs (x) and for
-# alcohol and tobacco (y); scores from utils/party_map_scores.R. Dashed lines at the sample means split
-# the map into four quadrants. Output: out/fig_party_map.pdf and out/fig_party_map.tex (panel b,
+# Figure 4a: every party by the weighted mean preferred policy of its voters for the illicit drugs (x) and for
+# alcohol and tobacco (y), with an ellipse of sd_mult weighted standard deviations of its voters: the weighted
+# covariance of x and y, so the ellipse's width and height are sd_mult standard deviations either side of the
+# mean on each axis, and its tilt is the correlation of the two scores within the party. Scores from
+# utils/party_map_scores.R. Dashed lines at the sample means split the map into four quadrants. Colour: the
+# party's bloc. Output: out/fig_party_map.pdf and out/fig_party_map.tex (panel b,
 # figures/fig_regulation_quadrants.pdf, is drawn by hand; the panel letters are set in LaTeX).
-# Variants of this map (other drug pairs, medians, modes, middle options): exploratory/party_map_variants.R
+# Variants of this map (logos, other drug pairs, medians, modes, middle options): exploratory/party_map_variants.R
+
+sd_mult <- 0.2   # ellipse size in standard deviations of the party's voters; the caption follows
 
 # tick labels: the answer options (as in figure 2) with their number
 option_ticks <- c("Ban (1)", "Research only (2)", "Treatment only (3)", "Prescription only (4)",
@@ -21,20 +26,32 @@ quadrants <- tibble(
   label = c("Double standards (status quo)", "Liberals", "Abstainers", "Reformers"),
   fill = c("#E69F00", "#009E73", "#56B4E9", "#CC79A7")
 )
+bloc_colours <- c(Left = "#b2182b", Centre = "#6a3d9a", Right = "#08306b")   # dark, to stand out on the tints
 
 # all parties with respondents are on the map
 stopifnot(setequal(party_means$party, setdiff(na.omit(as.character(unique(df$vote_recall_rec))), excluded)))
 
-# axis ranges with room for the corner labels
-pad <- \(r) r + c(-1, 1) * 0.16 * diff(r)
-xlim <- pad(range(c(party_means$x, ref[["x"]])))
-ylim <- pad(range(c(party_means$y, ref[["y"]])))
+# per party: weighted mean and covariance of its voters' two scores, and the ellipse (the unit circle through
+# the covariance's Cholesky factor, times sd_mult)
+bloc <- df |> distinct(party = as.character(vote_recall_rec), bloc = vote_3) |> drop_na()
+parties <- resp |>
+  summarise(n = n(), cov = list(cov.wt(cbind(x, y), w)$cov), x = weighted.mean(x, w), y = weighted.mean(y, w),
+            .by = party) |>
+  left_join(bloc, by = "party") |>
+  mutate(bloc = factor(bloc, c("left", "middle", "right"), names(bloc_colours)))
+circle <- cbind(cos(seq(0, 2 * pi, length.out = 121)), sin(seq(0, 2 * pi, length.out = 121)))
+ellipses <- parties |>
+  mutate(pts = pmap(list(x, y, cov), \(x, y, cov) {
+    e <- sd_mult * circle %*% chol(cov)
+    tibble(ex = x + e[, 1], ey = y + e[, 2])
+  })) |>
+  select(party, bloc, pts) |>
+  unnest(pts)
 
-# logos moved apart on the panel (width, height in mm), with a line from the party's own position to its
-# logo when it moved
-logo_scale <- 0.5
-data <- repel_logos(party_means, xlim, ylim, panel_mm = c(5.45, 3.95) * 25.4, scale = logo_scale)
-moved <- filter(data, abs(x - x0) / diff(xlim) * 5.45 * 25.4 > 1 | abs(y - y0) / diff(ylim) * 3.95 * 25.4 > 1)
+# axis ranges: the ellipses, with room for the corner labels
+pad <- \(r) r + c(-1, 1) * 0.16 * diff(r)
+xlim <- pad(range(c(ellipses$ex, ref[["x"]])))
+ylim <- pad(range(c(ellipses$ey, ref[["y"]])))
 
 # tinted quadrants, each named in its outer corner
 quad <- quadrants |>
@@ -44,37 +61,45 @@ quad <- quadrants |>
          ly = if_else(qy == "bottom", ylim[1] + 0.015 * diff(ylim), ylim[2] - 0.015 * diff(ylim)),
          hjust = if_else(qx == "left", 0, 1), vjust = if_else(qy == "bottom", 0, 1))
 
-p_map <- ggplot(data, aes(x, y)) +
+p_map <- ggplot(parties, aes(x, y, colour = bloc)) +
   geom_rect(data = quad, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = quad$fill,
             alpha = 0.1, inherit.aes = FALSE) +
   geom_text(data = quad, aes(lx, ly, label = label, hjust = hjust, vjust = vjust),
             colour = colorspace::darken(quad$fill, 0.35), fontface = "bold", size = 2.6, inherit.aes = FALSE) +
   geom_hline(yintercept = ref[["y"]], linetype = "dashed", linewidth = 0.3, colour = "grey50") +
   geom_vline(xintercept = ref[["x"]], linetype = "dashed", linewidth = 0.3, colour = "grey50") +
-  geom_segment(data = moved, aes(x0, y0, xend = x, yend = y), colour = "grey55", linewidth = 0.25) +
-  annotation_custom(logo_grob(data, xlim, ylim, logo_scale)) +
-  geom_point(data = filter(data, !party %in% names(logos)), size = 2.5, colour = "#3b528b") +
-  scale_x_continuous(breaks = 1:9, labels = option_ticks, limits = xlim, oob = scales::oob_keep) +
-  scale_y_continuous(breaks = 1:9, labels = option_ticks, limits = ylim, oob = scales::oob_keep) +
+  geom_polygon(data = ellipses, aes(ex, ey, group = party, fill = bloc), alpha = 0.12, linewidth = 0.4) +
+  geom_point(aes(size = n)) +
+  geom_label_repel(aes(label = party), size = 2.3, fontface = "bold", fill = alpha("white", 0.8), label.size = NA,
+                   label.padding = 0.1, min.segment.length = 0, segment.size = 0.2, box.padding = 0.25, seed = 1,
+                   show.legend = FALSE) +
+  scale_colour_manual(values = bloc_colours, aesthetics = c("colour", "fill"), name = NULL) +
+  scale_size_area(max_size = 3, breaks = c(25, 100, 200), name = "Voters (n)") +
+  scale_x_continuous(breaks = 1:9, labels = option_ticks) +
+  scale_y_continuous(breaks = 1:9, labels = option_ticks) +
   coord_cartesian(xlim = xlim, ylim = ylim, expand = FALSE) +
   labs(x = "Mean preferred policy: illicit drugs", y = "Mean preferred policy:\nalcohol and tobacco") +
   theme_minimal(base_size = 10) +
   theme(panel.grid.minor = element_blank(),
         text = element_text(size = 8),
         axis.text = element_text(size = 7, lineheight = 0.9),
+        legend.position = "right", legend.key.size = unit(0.4, "cm"),
         plot.margin = margin(4, 8, 4, 4))
 
-ggsave(here::here("out", "fig_party_map.pdf"), p_map, width = 6.5, height = 4.6, device = cairo_pdf)
+ggsave(here::here("out", "fig_party_map.pdf"), p_map, width = 6.5, height = 4.8, device = cairo_pdf)
 
 caption <- paste0(
-  r"((a) Parties by mean preferred policy for the illicit drugs (horizontal) and for alcohol and tobacco )",
-  r"((vertical), from ban (1) to free sale (9). Per respondent the mean answer over the substances answered, )",
-  r"(then the weighted mean per party: horizontal over cannabis, psychedelics, MDMA, speed, cocaine and heroin, )",
-  r"(vertical over alcohol and tobacco. Dashed lines are the sample means and split the map into four )",
+  r"((a) Parties by the mean preferred policy of their voters for the illicit drugs (horizontal) and for alcohol )",
+  r"(and tobacco (vertical), from ban (1) to free sale (9). Per respondent the mean answer over the substances )",
+  r"(answered: horizontal over cannabis, psychedelics, MDMA, speed, cocaine and heroin, vertical over alcohol and )",
+  r"(tobacco. Dot: the party's weighted mean; ellipse: )",
+  sprintf(r"($\pm %s$ standard deviation of its voters (weighted covariance), scaled down so that the parties )", sd_mult),
+  r"(can be told apart: at full size the ellipses overlap heavily. Their tilt shows the correlation of the two )",
+  r"(scores within the party. Colour: bloc. Dashed lines are the sample means and split the map into four )",
   r"(quadrants: more liberal than average on the legal drugs only (double standards, the status quo), on both )",
   r"((liberals), on neither (abstainers) or on the illicit drugs only (reformers). )",
-  sprintf(r"(Logo size reflects $n$ ($n = %d$ in total); DENK ($n = 1$), other parties, blank and )",
-          sum(party_means$n)),
+  sprintf(r"(Point size reflects $n$ ($n = %d$ in total); DENK ($n = 1$), other parties, blank and )",
+          sum(parties$n)),
   r"(non-voters are left out. Vote: TK 2025. )",
   r"((b) The four quadrants on the U-curve of harms by regulatory regime, adapted from the Transform Drug )",
   r"(Policy Foundation: the arrows show the direction of change each quadrant prefers, for the illicit drugs )",

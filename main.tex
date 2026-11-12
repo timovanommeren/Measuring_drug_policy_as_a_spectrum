@@ -18,6 +18,7 @@
 \usepackage{booktabs, tabularx}
 \addbibresource{references.bib}
 \input{out/methods_numbers}
+\input{out/party_within_between_numbers}
 \usepackage[hidelinks]{hyperref}
 \usepackage{booktabs}
 \usepackage{array}
@@ -104,6 +105,10 @@ A common patterns seems to hold across most drugs and demographics (Figure~\ref{
 Figure~\ref{fig:party_map} places the parties by their mean preferred policy for the illicit drugs and for alcohol and tobacco, with the sample means (2.8 and 5.7) splitting the map into four quadrants. PVV and JA21 voters hold the double standards of the status quo: stricter than average on the illicit drugs (2.3, between research and treatment) and more liberal on alcohol and tobacco (6.0, a for-profit specialist shop). Voters of SP, PvdD, GroenLinks-PvdA, Volt and D66 are reformers, the mirror image: more liberal on the illicit drugs (3.2--3.5) and stricter on alcohol and tobacco (5.2--5.6). Only FvD voters are more liberal on both (3.2 and 6.6), while ChristenUnie (2.2 and 5.0) and 50PLUS voters (1.7 and 4.5) are stricter on both. SGP voters are the strictest on the illicit drugs (1.6) but average on alcohol and tobacco (5.8); VVD, CDA and BBB voters sit close to the sample means.
 
 \input{out/fig_party_map}
+
+The ellipses in Figure~\ref{fig:party_map}a are drawn at a fifth of a standard deviation of each party's voters; at full size they overlap heavily. Party explains only \pwbEtaIllicit\% of the variance in the preferred policy for the illicit drugs and \pwbEtaLegal\% for alcohol and tobacco. The ellipses also tilt the other way from the parties: within each party, voters who are more liberal on the illicit drugs are also more liberal on alcohol and tobacco, whereas across the large parties a more liberal position on the illicit drugs goes with a stricter one on alcohol and tobacco. Table~\ref{tab:party_within_between} separates the two. Within parties, a voter one point more liberal than their party on the illicit drugs is \pwbAllWithin{} points more liberal on alcohol and tobacco (\pwbAllWithinP). Between the six largest parties the slope is reversed, \pwbSixBetween{} (\pwbSixBetweenP), and differs clearly from the within-party slope (\pwbSixContext, \pwbSixContextP). Across all fourteen parties the between-party slope is \pwbAllBetween{} (\pwbAllBetweenP), because the voters of SGP, ChristenUnie and 50PLUS are strict on both. Individuals thus differ mainly in how permissive they are towards drugs in general, while the large parties differ in which drugs they treat as acceptable.
+
+\input{out/tab_party_within_between}
 
 % \textbf{Policy sliders.} Respondents placed nine substances, \emph{alcohol, tabak, cannabis, psychedelica, MDMA, cocaïne/crack, speed, heroïne} and \emph{zware pijnstillers}, on a 0--100 slider anchored by nine described regulatory models:
 

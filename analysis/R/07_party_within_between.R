@@ -1,0 +1,79 @@
+library(tidyverse)
+library(lmerTest)   # lme4 with p values for the fixed effects (Satterthwaite)
+
+source(here::here("analysis", "R", "00_load_and_clean.R"))
+source(here::here("analysis", "R", "utils", "party_map_scores.R"))
+
+# Within- and between-party relation of the two scores of figure 4a: mean preferred policy for alcohol and tobacco
+# (y) on mean preferred policy for the illicit drugs (x), with x split into the party mean (between) and the
+# voter's distance from it (within), so the two slopes are estimated separately (Bell & Jones 2015, "within-between"
+# model). Random intercept per party; a random within-slope adds nothing (its variance is ~0) and cannot be
+# estimated with six parties. Two models: all 14 parties on the map, and the six largest. The contextual model
+# (x and the party mean together) tests between minus within.
+# Weights: the survey weights scaled to mean 1, as lme4's precision weights (an approximation; lme4 has no
+# sampling weights).
+# Also the share of each score's variance between parties (weighted eta squared).
+# Output: out/tab_party_within_between.tex (table) and out/party_within_between_numbers.tex (macros for the text)
+
+largest <- c("GroenLinks-PvdA", "D66", "VVD", "PVV", "CDA", "JA21")
+samples <- list(all = resp, six = filter(resp, party %in% largest))
+
+fits <- map(samples, \(data) {
+  data <- data |>
+    mutate(x_between = weighted.mean(x, w), x_within = x - x_between, .by = party) |>
+    mutate(w1 = w / mean(w))
+  m <- lmer(y ~ x_within + x_between + (1 | party), data = data, weights = w1, REML = FALSE)
+  ctx <- lmer(y ~ x + x_between + (1 | party), data = data, weights = w1, REML = FALSE)
+  coefs <- rbind(coef(summary(m))[c("x_within", "x_between"), ], coef(summary(ctx))["x_between", , drop = FALSE])
+  list(coefs = tibble(term = c("within", "between", "contextual"), est = coefs[, "Estimate"], se = coefs[, "Std. Error"],
+                      p = coefs[, "Pr(>|t|)"]),
+       var_party = as.data.frame(VarCorr(m))$vcov[1], var_resid = sigma(m)^2,
+       n = nrow(data), parties = n_distinct(data$party))
+})
+
+num <- \(x) sub("^-", "$-$", sprintf("%.2f", x))
+pval <- \(p) if_else(p < 0.001, "$p < .001$", paste0("$p = ", sub("^0", "", sprintf("%.3f", p)), "$"))
+cell <- \(f, t) with(filter(f$coefs, term == t), sprintf("%s (%s), %s", num(est), sprintf("%.2f", se), pval(p)))
+
+writeLines(c(
+  r"(\begin{table}[H])",
+  r"(\centering\small)",
+  paste0(r"(\caption{Within- and between-party relation of the two scores of Figure~\ref{fig:party_map}: mean )",
+         r"(preferred policy for alcohol and tobacco regressed on mean preferred policy for the illicit drugs (both )",
+         r"(1 = ban \ldots{} 9 = free sale), split into the party mean (between) and the voter's distance from it )",
+         r"((within). Linear mixed models with a random intercept per party, survey weights; estimate (standard error), )",
+         r"($p$ with Satterthwaite degrees of freedom. Between $-$ within: the party-mean coefficient in a model with )",
+         r"(the voter's own score, which tests whether the two slopes differ. Six largest parties: GroenLinks-PvdA, D66, )",
+         r"(VVD, PVV, CDA and JA21.})"),
+  r"(\label{tab:party_within_between})",
+  r"(\begin{tabular}{@{}lll@{}})",
+  r"(\toprule)",
+  r"( & All parties & Six largest parties \\)",
+  r"(\midrule)",
+  sprintf(r"(Within parties & %s & %s \\)", cell(fits$all, "within"), cell(fits$six, "within")),
+  sprintf(r"(Between parties & %s & %s \\)", cell(fits$all, "between"), cell(fits$six, "between")),
+  sprintf(r"(Between $-$ within & %s & %s \\)", cell(fits$all, "contextual"), cell(fits$six, "contextual")),
+  r"(\addlinespace)",
+  sprintf(r"(Variance between parties (intercept) & %.3f & %.3f \\)", fits$all$var_party, fits$six$var_party),
+  sprintf(r"(Residual variance & %.2f & %.2f \\)", fits$all$var_resid, fits$six$var_resid),
+  sprintf(r"(Respondents & %s & %s \\)", format(fits$all$n, big.mark = "{,}"), fits$six$n),
+  sprintf(r"(Parties & %d & %d \\)", fits$all$parties, fits$six$parties),
+  r"(\bottomrule)",
+  r"(\end{tabular})",
+  r"(\end{table})"
+), here::here("out", "tab_party_within_between.tex"))
+
+# macros for the text: \pwb<Sample><Term>, e.g. \pwbSixBetween, and \pwbSixBetweenP for its p value
+macros <- imap(fits, \(f, s) {
+  s <- c(all = "All", six = "Six")[[s]]
+  t <- c(within = "Within", between = "Between", contextual = "Context")
+  with(f$coefs, c(setNames(num(est), paste0("pwb", s, t[term])), setNames(pval(p), paste0("pwb", s, t[term], "P"))))
+}) |> unname() |> unlist()
+
+# share of the variance in each score between parties (weighted eta squared), in %
+eta2 <- \(v) { m <- weighted.mean(resp[[v]], resp$w); pm <- ave(resp[[v]] * resp$w, resp$party, FUN = sum) / ave(resp$w, resp$party, FUN = sum)
+                sum(resp$w * (pm - m)^2) / sum(resp$w * (resp[[v]] - m)^2) }
+macros <- c(macros, pwbEtaIllicit = sprintf("%.0f", 100 * eta2("x")), pwbEtaLegal = sprintf("%.0f", 100 * eta2("y")))
+writeLines(c("% generated by analysis/R/07_party_within_between.R -- do not edit by hand",
+             sprintf("\\newcommand{\\%s}{%s}", names(macros), macros)),
+           here::here("out", "party_within_between_numbers.tex"))

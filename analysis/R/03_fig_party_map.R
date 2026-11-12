@@ -9,8 +9,14 @@ source(here::here("analysis", "R", "utils", "party_map_scores.R"))
 # covariance of x and y, so the ellipse's width and height are sd_mult standard deviations either side of the
 # mean on each axis, and its tilt is the correlation of the two scores within the party. Scores from
 # utils/party_map_scores.R. Dashed lines at the sample means split the map into four quadrants. Colour: the
-# party's bloc. Output: out/fig_party_map.pdf and out/fig_party_map.tex (panel b,
-# figures/fig_regulation_quadrants.pdf, is drawn by hand; the panel letters are set in LaTeX).
+# party's bloc.
+# Figure 4b: the same party means on a stylised U-curve of harms by regulatory regime (after the Transform Drug
+# Policy Foundation), drawn over the same 1-9 scale: each party sits on the curve twice, at its mean for the
+# illicit drugs and for alcohol and tobacco, so its height is the harm the stylised curve implies for that regime.
+# Six largest parties. Each arrow starts on the U at the party mean and points horizontally away from the sample
+# mean; its length is the distance from the sample mean x the party's voters. The curve and the regime labels are
+# illustrative.
+# Output: out/fig_party_map.pdf (a), out/fig_party_map_b.pdf (b) and out/fig_party_map.tex (panel letters in LaTeX).
 # Variants of this map (logos, other drug pairs, medians, modes, middle options): exploratory/party_map_variants.R
 
 sd_mult <- 0.2   # ellipse size in standard deviations of the party's voters; the caption follows
@@ -88,6 +94,59 @@ p_map <- ggplot(parties, aes(x, y, colour = bloc)) +
 
 ggsave(here::here("out", "fig_party_map.pdf"), p_map, width = 6.5, height = 4.8, device = cairo_pdf)
 
+# panel b: the stylised U, lowest at 5 (specialist shop, non-profit: responsible legal regulation), with a narrow
+# rounded bottom so that positions near it still differ in height; on_arm() gives the x on an arm at a height
+harm <- \(x) sqrt(((x - 5) / 4)^2 + 0.01)
+on_arm <- \(h, side) 5 + side * 4 * sqrt(pmax(h^2 - 0.01, 0))
+largest <- c("GroenLinks-PvdA", "D66", "VVD", "PVV", "CDA", "JA21")
+max_len <- 1.6    # length of the longest arrow, in scale points
+min_gap <- 0.03   # smallest height difference between two arrows
+
+# per party and drug group: the arrow starts on the U at the party mean and points away from the sample mean, its
+# length the distance from the sample mean x voters, scaled so the longest is max_len. Parties closer than min_gap
+# in height are spread upward along the curve, so every arrow still starts on the U
+spread <- \(h) accumulate(h, \(prev, cur) max(cur, prev + min_gap))
+arrows <- bind_rows(
+  transmute(filter(parties, party %in% largest), party, bloc, n, drugs = "Illicit drugs", mean = ref[["x"]], x),
+  transmute(filter(parties, party %in% largest), party, bloc, n, drugs = "Alcohol and tobacco", mean = ref[["y"]],
+            x = y)) |>
+  mutate(side = sign(x - 5), pull = (x - mean) * n) |>
+  arrange(drugs, harm(x)) |>
+  mutate(h = spread(harm(x)), x0 = on_arm(h, side), .by = drugs) |>
+  mutate(x1 = x0 + max_len * pull / max(abs(pull)))
+means <- tibble(drugs = c("illicit drugs", "alcohol and tobacco"), x = c(ref[["x"]], ref[["y"]]), y = harm(x))
+regimes <- tibble(x = c(0.95, 3, 5, 7.5, 9.05), hjust = c(0, 0.5, 0.5, 0.5, 1),
+                  label = c("Prohibition", "Medical access\n& harm reduction", "Responsible\nlegal regulation",
+                            "Lax regulation", "Unrestricted\naccess"))
+
+p_curve <- ggplot() +
+  geom_line(data = tibble(x = seq(1, 9, 0.01), y = harm(x)), aes(x, y), colour = "grey35", linewidth = 0.6) +
+  geom_segment(data = means, aes(x = x, xend = x, y = -0.06, yend = y), linetype = "dashed", colour = "grey55",
+               linewidth = 0.3) +
+  geom_text(data = means, aes(x, -0.09, label = paste("Mean,", drugs)), size = 2.3, colour = "grey30") +
+  geom_segment(data = arrows, aes(x = x0, xend = x1, y = h, yend = h, colour = bloc), linewidth = 0.9,
+               arrow = arrow(length = unit(1.6, "mm"), type = "closed")) +
+  geom_point(data = arrows, aes(x0, h, colour = bloc), size = 1.6) +
+  geom_text(data = arrows, aes(x1 + sign(pull) * 0.08, h, label = party, colour = bloc, hjust = if_else(pull > 0, 0, 1)),
+            size = 2.3, fontface = "bold", show.legend = FALSE) +
+  geom_text(data = regimes, aes(x, 1.05, label = label, hjust = hjust), size = 2.3, lineheight = 0.85,
+            colour = "grey30") +
+  annotate("text", x = c(1.5, 6.6), y = c(0.9, 0.5), label = c("Illicit drugs", "Alcohol and tobacco"),
+           fontface = "bold", size = 2.8, hjust = 0) +
+  scale_colour_manual(values = bloc_colours, name = NULL) +
+  scale_x_continuous(breaks = 1:9, labels = c("Ban (1)", "Research\nonly (2)", "Treatment\nonly (3)",
+                                              "Prescription\nonly (4)", "Shop,\nnon-profit (5)", "Shop,\nfor-profit (6)",
+                                              "Everywhere,\nno ads (7)", "Everywhere,\nads (8)", "Free sale (9)")) +
+  scale_y_continuous(breaks = NULL) +
+  coord_cartesian(xlim = c(0.9, 9.1), ylim = c(-0.12, 1.1), expand = FALSE) +
+  labs(x = "Mean preferred policy", y = "Harms, social and health (stylised)") +
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(), text = element_text(size = 8),
+        axis.text = element_text(size = 6.5, lineheight = 0.9), legend.position = "right",
+        legend.key.size = unit(0.4, "cm"), plot.margin = margin(4, 8, 4, 4))
+
+ggsave(here::here("out", "fig_party_map_b.pdf"), p_curve, width = 6.5, height = 4.6, device = cairo_pdf)
+
 caption <- paste0(
   r"((a) Parties by the mean preferred policy of their voters for the illicit drugs (horizontal) and for alcohol )",
   r"(and tobacco (vertical), from ban (1) to free sale (9). Per respondent the mean answer over the substances )",
@@ -101,9 +160,12 @@ caption <- paste0(
   sprintf(r"(Point size reflects $n$ ($n = %d$ in total); DENK ($n = 1$), other parties, blank and )",
           sum(parties$n)),
   r"(non-voters are left out. Vote: TK 2025. )",
-  r"((b) The four quadrants on the U-curve of harms by regulatory regime, adapted from the Transform Drug )",
-  r"(Policy Foundation: the arrows show the direction of change each quadrant prefers, for the illicit drugs )",
-  r"((left) and for alcohol, tobacco and vapes (right).)"
+  r"((b) The six largest parties on a stylised U-curve of harms by regulatory regime, after the Transform Drug )",
+  r"(Policy Foundation, drawn over the same scale as (a). Each arrow starts on the curve at the party's mean, for the )",
+  r"(illicit drugs and for alcohol and tobacco, so its height is the harm the stylised curve implies for that )",
+  r"(position, and points away from the sample mean (dashed); its length is the distance from the sample mean times )",
+  r"(the party's number of voters. Where two parties nearly coincide, one is moved a little along the curve. The )",
+  r"(curve and the placement of the regime labels on the scale are illustrative, not measured.)"
 )
 
 writeLines(c(
@@ -112,7 +174,7 @@ writeLines(c(
   r"(  \makebox[\linewidth][l]{\textbf{a}})",
   r"(  \includegraphics[width=\linewidth]{out/fig_party_map.pdf}\\[4pt])",
   r"(  \makebox[\linewidth][l]{\textbf{b}})",
-  r"(  \includegraphics[width=0.72\linewidth]{figures/fig_regulation_quadrants.pdf})",
+  r"(  \includegraphics[width=\linewidth]{out/fig_party_map_b.pdf})",
   paste0(r"(  \caption{)", caption, "}"),
   r"(  \label{fig:party_map})",
   r"(\end{figure})"

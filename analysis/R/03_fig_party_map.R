@@ -45,11 +45,24 @@ parties <- resp |>
   left_join(bloc, by = "party") |>
   mutate(bloc = factor(bloc, c("left", "middle", "right"), names(bloc_colours)))
 circle <- cbind(cos(seq(0, 2 * pi, length.out = 121)), sin(seq(0, 2 * pi, length.out = 121)))
+
+# what sets the size of an ellipse (its shape and tilt always come from the party's covariance):
+#   "sd"      sd_mult standard deviations of the party's voters; party size is the dot at the mean
+#   "sd_n"    as "sd", with the area also scaled by the party's number of voters relative to the median party
+#   "n_shape" area set by the party's number of voters only (the median party as large as under "sd")
+ellipse_size <- "sd"   # the version in the paper; all three are also written to analysis/output/ for comparison
+size_labels <- c(sd = "standard deviation", sd_n = "standard deviation x party size", n_shape = "party size")
+
+panel_a <- function(mode) {
+rel_n <- parties$n / median(parties$n)
+unit_r <- median(map_dbl(parties$cov, \(v) det(v)^(1 / 4)))   # radius of the median party's sd ellipse, per sd_mult
 ellipses <- parties |>
-  mutate(pts = pmap(list(x, y, cov), \(x, y, cov) {
-    e <- sd_mult * circle %*% chol(cov)
-    tibble(ex = x + e[, 1], ey = y + e[, 2])
-  })) |>
+  mutate(k = case_when(mode == "sd" ~ sd_mult, mode == "sd_n" ~ sd_mult * sqrt(rel_n),
+                       mode == "n_shape" ~ sd_mult * unit_r * sqrt(rel_n) / map_dbl(cov, \(v) det(v)^(1 / 4))),
+         pts = pmap(list(x, y, cov, k), \(x, y, cov, k) {
+           e <- k * circle %*% chol(cov)
+           tibble(ex = x + e[, 1], ey = y + e[, 2])
+         })) |>
   select(party, bloc, pts) |>
   unnest(pts)
 
@@ -66,7 +79,7 @@ quad <- quadrants |>
          ly = if_else(qy == "bottom", ylim[1] + 0.015 * diff(ylim), ylim[2] - 0.015 * diff(ylim)),
          hjust = if_else(qx == "left", 0, 1), vjust = if_else(qy == "bottom", 0, 1))
 
-p_map <- ggplot(parties, aes(x, y, colour = bloc)) +
+ggplot(parties, aes(x, y, colour = bloc)) +
   geom_rect(data = quad, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = quad$fill,
             alpha = 0.1, inherit.aes = FALSE) +
   geom_text(data = quad, aes(lx, ly, label = label, hjust = hjust, vjust = vjust),
@@ -74,7 +87,7 @@ p_map <- ggplot(parties, aes(x, y, colour = bloc)) +
   geom_hline(yintercept = ref[["y"]], linetype = "dashed", linewidth = 0.3, colour = "grey50") +
   geom_vline(xintercept = ref[["x"]], linetype = "dashed", linewidth = 0.3, colour = "grey50") +
   geom_polygon(data = ellipses, aes(ex, ey, group = party, fill = bloc), alpha = 0.12, linewidth = 0.4) +
-  geom_point(aes(size = n)) +
+  { if (mode == "sd") geom_point(aes(size = n)) else geom_point(size = 0.9) } +
   geom_label_repel(aes(label = party), size = 2.3, fontface = "bold", fill = alpha("white", 0.8), label.size = NA,
                    label.padding = 0.1, min.segment.length = 0, segment.size = 0.2, box.padding = 0.25, seed = 1,
                    show.legend = FALSE) +
@@ -90,8 +103,12 @@ p_map <- ggplot(parties, aes(x, y, colour = bloc)) +
         axis.text = element_text(size = 7, lineheight = 0.9),
         legend.position = "right", legend.key.size = unit(0.4, "cm"),
         plot.margin = margin(4, 8, 4, 4))
+}
 
-ggsave(here::here("out", "fig_party_map.pdf"), p_map, width = 6.5, height = 4.8, device = cairo_pdf)
+ggsave(here::here("out", "fig_party_map.pdf"), panel_a(ellipse_size), width = 6.5, height = 4.8, device = cairo_pdf)
+dir.create(here::here("analysis", "output"), showWarnings = FALSE)
+walk(names(size_labels), \(m) ggsave(here::here("analysis", "output", paste0("fig_party_map_a_", m, ".pdf")),
+                                      panel_a(m), width = 6.5, height = 4.8, device = cairo_pdf))
 
 # panel b: the stylised U, lowest at 5 (responsible legal regulation), with a rounded bottom; on_arm() gives the
 # x on an arm at a given height

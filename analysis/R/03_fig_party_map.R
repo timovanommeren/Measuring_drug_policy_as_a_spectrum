@@ -31,7 +31,7 @@ quadrants <- tibble(
   label = c("Double standards (status quo)", "Liberals", "Abstainers", "Reformers"),
   fill = c("#E69F00", "#009E73", "#56B4E9", "#CC79A7")
 )
-bloc_colours <- c(Left = "#b2182b", Centre = "#6a3d9a", Right = "#08306b")   # dark, to stand out on the tints
+bloc_colours <- c(Left = "#1b7837", Centre = "#b35806", Right = "#2b3a8f")   # dark and distinct, to stand out on the tints
 
 # all parties with respondents are on the map
 stopifnot(setequal(party_means$party, setdiff(na.omit(as.character(unique(df$vote_recall_rec))), excluded)))
@@ -49,16 +49,19 @@ circle <- cbind(cos(seq(0, 2 * pi, length.out = 121)), sin(seq(0, 2 * pi, length
 # what sets the size of an ellipse (its shape and tilt always come from the party's covariance):
 #   "sd"      sd_mult standard deviations of the party's voters; party size is the dot at the mean
 #   "sd_n"    as "sd", with the area also scaled by the party's number of voters relative to the median party
-#   "n_shape" area set by the party's number of voters only (the median party as large as under "sd")
+#   "n_shape" area set by the party's number of voters only
+# both party-size versions are drawn at n_mult times their width and height (0.5: half; under "n_shape" the
+# median party then has half the width of its "sd" ellipse)
 ellipse_size <- "sd"   # the version in the paper; all three are also written to analysis/output/ for comparison
 size_labels <- c(sd = "standard deviation", sd_n = "standard deviation x party size", n_shape = "party size")
+n_mult <- 0.5
 
-panel_a <- function(mode) {
+panel_a <- function(mode, title = FALSE) {
 rel_n <- parties$n / median(parties$n)
 unit_r <- median(map_dbl(parties$cov, \(v) det(v)^(1 / 4)))   # radius of the median party's sd ellipse, per sd_mult
 ellipses <- parties |>
-  mutate(k = case_when(mode == "sd" ~ sd_mult, mode == "sd_n" ~ sd_mult * sqrt(rel_n),
-                       mode == "n_shape" ~ sd_mult * unit_r * sqrt(rel_n) / map_dbl(cov, \(v) det(v)^(1 / 4))),
+  mutate(k = case_when(mode == "sd" ~ sd_mult, mode == "sd_n" ~ n_mult * sd_mult * sqrt(rel_n),
+                       mode == "n_shape" ~ n_mult * sd_mult * unit_r * sqrt(rel_n) / map_dbl(cov, \(v) det(v)^(1 / 4))),
          pts = pmap(list(x, y, cov, k), \(x, y, cov, k) {
            e <- k * circle %*% chol(cov)
            tibble(ex = x + e[, 1], ey = y + e[, 2])
@@ -96,9 +99,11 @@ ggplot(parties, aes(x, y, colour = bloc)) +
   scale_x_continuous(breaks = 1:9, labels = option_ticks) +
   scale_y_continuous(breaks = 1:9, labels = option_ticks) +
   coord_cartesian(xlim = xlim, ylim = ylim, expand = FALSE) +
-  labs(x = "Mean preferred policy: illicit drugs", y = "Mean preferred policy:\nalcohol and tobacco") +
+  labs(x = "Mean preferred policy: illicit drugs", y = "Mean preferred policy:\nalcohol and tobacco",
+       title = if (title) paste("Ellipse size:", size_labels[[mode]])) +
   theme_minimal(base_size = 10) +
   theme(panel.grid.minor = element_blank(),
+        plot.title = element_text(size = 9, face = "bold"),
         text = element_text(size = 8),
         axis.text = element_text(size = 7, lineheight = 0.9),
         legend.position = "right", legend.key.size = unit(0.4, "cm"),
@@ -108,7 +113,7 @@ ggplot(parties, aes(x, y, colour = bloc)) +
 ggsave(here::here("out", "fig_party_map.pdf"), panel_a(ellipse_size), width = 6.5, height = 4.8, device = cairo_pdf)
 dir.create(here::here("analysis", "output"), showWarnings = FALSE)
 walk(names(size_labels), \(m) ggsave(here::here("analysis", "output", paste0("fig_party_map_a_", m, ".pdf")),
-                                      panel_a(m), width = 6.5, height = 4.8, device = cairo_pdf))
+                                      panel_a(m, title = TRUE), width = 6.5, height = 5, device = cairo_pdf))
 
 # panel b: the stylised U, lowest at 5 (responsible legal regulation), with a rounded bottom; on_arm() gives the
 # x on an arm at a given height
